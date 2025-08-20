@@ -1,19 +1,15 @@
 @echo off
 echo Starting YouTube Downloader GUI...
 
-:: Check if Python is installed (try both python and py commands)
-python --version >nul 2>&1
+:: Use py.exe explicitly
+set PYTHON_CMD="C:\Users\athar\AppData\Local\Programs\Python\Launcher\py.exe"
+
+:: Check if Python is installed
+%PYTHON_CMD% --version >nul 2>&1
 if %errorlevel% neq 0 (
-    py --version >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo Python is not installed or not in PATH. Please install Python 3.x
-        pause
-        exit /b 1
-    ) else (
-        set PYTHON_CMD=py
-    )
-) else (
-    set PYTHON_CMD=python
+    echo Python is not installed or not in PATH. Please install Python 3.x
+    pause
+    exit /b 1
 )
 
 :: Check if required packages are installed
