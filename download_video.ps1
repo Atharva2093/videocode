@@ -12,7 +12,7 @@ try {
     Write-Host "Error: Python is not installed or not in PATH." -ForegroundColor Red
     Write-Host "Please install Python from https://www.python.org/downloads/" -ForegroundColor Yellow
     Write-Host "Make sure to check 'Add Python to PATH' during installation." -ForegroundColor Yellow
-    Read-Host "Press Enter to exit"
+    Read-Host "Press Enter To exit"
     exit 1
 }
 
