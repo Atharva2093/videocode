@@ -27,12 +27,21 @@ class VideoQuality(str, Enum):
     P360 = "360p"
 
 
+class AudioQuality(str, Enum):
+    """Supported audio quality options"""
+    HIGH = "320"
+    MEDIUM = "192"
+    LOW = "128"
+    MOBILE = "64"
+
+
 class DownloadStatus(str, Enum):
     """Download status states"""
     QUEUED = "queued"
     FETCHING_INFO = "fetching_info"
     DOWNLOADING = "downloading"
     PROCESSING = "processing"
+    CONVERTING = "converting"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -53,6 +62,28 @@ class DownloadRequest(BaseModel):
     playlist_items: Optional[List[int]] = Field(default=None, description="Specific playlist items to download (1-indexed)")
 
 
+class DirectDownloadRequest(BaseModel):
+    """Request model for direct download (returns file)"""
+    url: str = Field(..., description="YouTube video URL")
+    format: VideoFormat = Field(default=VideoFormat.MP4, description="Video format")
+    quality: VideoQuality = Field(default=VideoQuality.BEST, description="Video quality")
+    audio_only: bool = Field(default=False, description="Download audio only")
+
+
+class ConvertRequest(BaseModel):
+    """Request model for conversion"""
+    url: str = Field(..., description="YouTube video URL")
+    output_format: str = Field(default="mp3", description="Output format (mp3, aac, wav, etc.)")
+    audio_quality: AudioQuality = Field(default=AudioQuality.MEDIUM, description="Audio quality in kbps")
+
+
+class MobileCompressionRequest(BaseModel):
+    """Request model for mobile-optimized compression"""
+    url: str = Field(..., description="YouTube video URL")
+    video_quality: str = Field(default="480p", description="Video quality (360p, 480p)")
+    audio_bitrate: str = Field(default="64", description="Audio bitrate in kbps")
+
+
 class CancelRequest(BaseModel):
     """Request model for cancelling a download"""
     task_id: str = Field(..., description="Task ID to cancel")
@@ -66,9 +97,55 @@ class FormatInfo(BaseModel):
     extension: str
     filesize: Optional[int] = None
     filesize_approx: Optional[int] = None
+    filesize_formatted: Optional[str] = None
     fps: Optional[int] = None
     vcodec: Optional[str] = None
     acodec: Optional[str] = None
+    bitrate: Optional[int] = None
+
+
+class MetadataResponse(BaseModel):
+    """Video metadata response for /metadata endpoint"""
+    id: str
+    title: str
+    description: Optional[str] = None
+    duration: Optional[int] = None
+    duration_formatted: Optional[str] = None
+    thumbnail: Optional[str] = None
+    channel: Optional[str] = None
+    channel_url: Optional[str] = None
+    view_count: Optional[int] = None
+    view_count_formatted: Optional[str] = None
+    like_count: Optional[int] = None
+    upload_date: Optional[str] = None
+    formats: List[FormatInfo] = []
+    total_size_approx: Optional[int] = None
+    total_size_formatted: Optional[str] = None
+
+
+class PlaylistVideoItem(BaseModel):
+    """Single video in a playlist"""
+    index: int
+    id: str
+    title: str
+    duration: Optional[int] = None
+    duration_formatted: Optional[str] = None
+    thumbnail: Optional[str] = None
+    url: str
+
+
+class PlaylistResponse(BaseModel):
+    """Playlist response for /playlist endpoint"""
+    id: str
+    title: str
+    description: Optional[str] = None
+    channel: Optional[str] = None
+    channel_url: Optional[str] = None
+    video_count: int
+    total_duration: Optional[int] = None
+    total_duration_formatted: Optional[str] = None
+    thumbnail: Optional[str] = None
+    videos: List[PlaylistVideoItem] = []
 
 
 class VideoInfo(BaseModel):

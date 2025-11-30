@@ -138,15 +138,74 @@ videocode/
 
 ## 🔌 API Endpoints
 
+### Phase 1 - Core Endpoints
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| POST | `/api/info` | Get video/playlist info |
-| POST | `/api/download` | Start a download |
+| POST | `/api/info` | Get video/playlist info (legacy) |
+
+### Phase 2 - Enhanced Endpoints
+
+#### 📊 Metadata & Info
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/metadata?url=` | Get comprehensive video metadata with formats & sizes |
+| GET | `/api/playlist?url=` | Get playlist with all video titles & IDs |
+| GET | `/api/thumbnail?url=&quality=` | Get video thumbnail as image (sd/mq/hq/maxres) |
+| GET | `/api/formats/{video_id}` | Get available formats for a video |
+
+#### ⬇️ Download
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/download` | Queue-based async download |
+| POST | `/api/download/direct` | Direct download (returns file immediately) |
 | GET | `/api/download/{task_id}` | Get download status |
+| GET | `/api/download/{task_id}/file` | Download completed file |
 | POST | `/api/download/cancel` | Cancel a download |
+| DELETE | `/api/download/{task_id}` | Remove download from history |
+
+#### 🔄 Convert & Compress
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/convert` | Download & convert to format (mp3/mp4/webm) |
+| POST | `/api/mobile-compression` | Mobile-optimized download (480p/64kbps) |
+
+#### 📋 Queue Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
 | GET | `/api/queue` | Get queue status |
 | DELETE | `/api/queue/clear` | Clear completed downloads |
+
+### Example API Calls
+
+```bash
+# Get video metadata
+curl "http://localhost:8000/api/metadata?url=https://youtube.com/watch?v=VIDEO_ID"
+
+# Get playlist info
+curl "http://localhost:8000/api/playlist?url=https://youtube.com/playlist?list=PLAYLIST_ID"
+
+# Get thumbnail
+curl "http://localhost:8000/api/thumbnail?url=https://youtube.com/watch?v=VIDEO_ID&quality=hq"
+
+# Direct download
+curl -X POST "http://localhost:8000/api/download/direct" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://youtube.com/watch?v=VIDEO_ID","quality":"720p","format":"mp4"}' \
+  -o video.mp4
+
+# Convert to MP3
+curl -X POST "http://localhost:8000/api/convert" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://youtube.com/watch?v=VIDEO_ID","output_format":"mp3","audio_quality":"high"}' \
+  -o audio.mp3
+
+# Mobile compression
+curl -X POST "http://localhost:8000/api/mobile-compression" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://youtube.com/watch?v=VIDEO_ID","max_resolution":"480p"}' \
+  -o mobile_video.mp4
+```
 
 ---
 
