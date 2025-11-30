@@ -8,13 +8,18 @@ A full-stack YouTube video and playlist downloader with a modern web interface a
 
 ## ✨ Features
 
-### 🖥️ Web Interface (NEW!)
-- Modern, responsive dark-themed UI
+### 🖥️ Web Interface (Phase 3)
+- Modern, responsive **mobile-first** dark-themed UI
+- **PWA Support** - Install as native app on mobile/desktop
 - Video metadata preview with thumbnail
+- **Format tabs**: Video, Audio, Mobile-optimized
+- Quality selection grid
 - Playlist support with selective downloads
 - Real-time download progress tracking
 - Download queue management
-- Multiple format and quality options
+- **Offline shell** - Basic UI works without connection
+- **Auto-paste** - Detects YouTube URLs from clipboard
+- Touch-friendly controls for mobile devices
 
 ### 🔧 API Backend (NEW!)
 - RESTful API built with FastAPI
@@ -112,13 +117,18 @@ videocode/
 │   ├── requirements.txt        # Python dependencies
 │   └── Dockerfile              # Docker configuration
 │
-├── frontend/                   # Web Frontend
+├── frontend/                   # Web Frontend (PWA)
 │   ├── css/
-│   │   └── styles.css          # Styling
+│   │   └── styles.css          # Mobile-first styling
 │   ├── js/
 │   │   ├── api.js              # API client
 │   │   └── app.js              # Main application
-│   └── index.html              # Main page
+│   ├── icons/                  # PWA icons
+│   │   ├── icon-192.svg        # App icon 192x192
+│   │   └── icon-512.svg        # App icon 512x512
+│   ├── index.html              # Main page
+│   ├── manifest.json           # PWA manifest
+│   └── sw.js                   # Service worker
 │
 ├── shared/                     # Shared utilities
 │   └── utils.py                # Common functions
