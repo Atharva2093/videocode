@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = 30  # Max requests per minute
     RATE_LIMIT_WINDOW: int = 60  # Window in seconds
+    RATE_LIMIT_DOWNLOADS: int = 3  # Max downloads per minute per IP
+    
+    # Metadata caching
+    METADATA_CACHE_TTL: int = 3600  # 1 hour in seconds
     
     # Streaming settings
     CHUNK_SIZE: int = 8192  # 8KB chunks for streaming

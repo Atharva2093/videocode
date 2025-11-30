@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import os
 import time
 
-from .routes import download, video_info, health
+from .routes import download, video_info, health, search
 from .config import settings
 from .worker import download_manager
 from .worker.ytdlp_downloader import downloader
@@ -93,11 +93,12 @@ app.add_middleware(
 
 # Add rate limiting middleware (simple implementation)
 request_counts = {}
+download_counts = {}
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    """Simple rate limiting middleware"""
+    """Rate limiting middleware with separate limits for downloads"""
     client_ip = request.client.host
     current_time = time.time()
     
@@ -107,12 +108,39 @@ async def rate_limit_middleware(request: Request, call_next):
         if current_time - t < settings.RATE_LIMIT_WINDOW
     ]
     
-    # Check rate limit
+    download_counts[client_ip] = [
+        t for t in download_counts.get(client_ip, [])
+        if current_time - t < settings.RATE_LIMIT_WINDOW
+    ]
+    
+    # Check general rate limit
     if len(request_counts.get(client_ip, [])) >= settings.RATE_LIMIT_REQUESTS:
         return JSONResponse(
             status_code=429,
-            content={"detail": "Too many requests. Please slow down."}
+            content={
+                "detail": "Too many requests. Please slow down.",
+                "error_code": "RATE_LIMIT_EXCEEDED",
+                "retry_after": settings.RATE_LIMIT_WINDOW
+            }
         )
+    
+    # Check download-specific rate limit
+    is_download_request = (
+        request.url.path.startswith('/api/download') and 
+        request.method == 'POST'
+    )
+    
+    if is_download_request:
+        if len(download_counts.get(client_ip, [])) >= settings.RATE_LIMIT_DOWNLOADS:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": f"Too many download requests. Maximum {settings.RATE_LIMIT_DOWNLOADS} downloads per minute.",
+                    "error_code": "DOWNLOAD_RATE_LIMIT_EXCEEDED",
+                    "retry_after": settings.RATE_LIMIT_WINDOW
+                }
+            )
+        download_counts.setdefault(client_ip, []).append(current_time)
     
     # Add current request
     request_counts.setdefault(client_ip, []).append(current_time)
@@ -125,6 +153,7 @@ async def rate_limit_middleware(request: Request, call_next):
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(video_info.router, prefix="/api", tags=["Video Info"])
 app.include_router(download.router, prefix="/api", tags=["Download"])
+app.include_router(search.router, prefix="/api", tags=["Search & Subtitles"])
 
 # Serve downloaded files
 if os.path.exists(settings.DOWNLOAD_DIR):
