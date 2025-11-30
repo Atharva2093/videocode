@@ -6,8 +6,8 @@ from fastapi import APIRouter
 import os
 import shutil
 
-from ..models import HealthResponse
-from ..config import settings
+from models import HealthResponse
+from config import settings
 
 router = APIRouter()
 

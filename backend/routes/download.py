@@ -17,14 +17,14 @@ import mimetypes
 from pathlib import Path
 from typing import Generator
 
-from ..models import (
+from models import (
     DownloadRequest, DownloadResponse, DownloadProgress,
     QueueStatus, CancelRequest, DownloadStatus,
     DirectDownloadRequest, ConvertRequest, MobileCompressionRequest, AudioQuality
 )
-from ..worker import download_manager
-from ..worker.ytdlp_downloader import downloader, DownloadError
-from ..config import settings
+from worker import download_manager
+from worker.ytdlp_downloader import downloader, DownloadError
+from config import settings
 
 router = APIRouter()
 

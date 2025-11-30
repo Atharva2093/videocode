@@ -18,7 +18,7 @@ import glob
 
 import yt_dlp
 
-from ..config import settings
+from config import settings
 
 
 class DownloadError(Exception):

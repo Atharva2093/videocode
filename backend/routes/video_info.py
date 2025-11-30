@@ -10,11 +10,11 @@ import yt_dlp
 import httpx
 import io
 
-from ..models import (
+from models import (
     VideoInfoRequest, VideoInfo, PlaylistInfo, FormatInfo,
     MetadataResponse, PlaylistResponse, PlaylistVideoItem
 )
-from ..config import settings
+from config import settings
 
 router = APIRouter()
 

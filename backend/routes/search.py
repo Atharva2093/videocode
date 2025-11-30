@@ -13,7 +13,7 @@ import json
 import os
 from pathlib import Path
 
-from ..config import settings
+from config import settings
 
 router = APIRouter()
 

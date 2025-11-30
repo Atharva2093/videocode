@@ -12,8 +12,8 @@ import threading
 
 import yt_dlp
 
-from ..models import DownloadProgress, DownloadStatus, QueueStatus
-from ..config import settings
+from models import DownloadProgress, DownloadStatus, QueueStatus
+from config import settings
 
 
 class DownloadManager:

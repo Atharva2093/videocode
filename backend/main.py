@@ -9,13 +9,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import os
+import sys
 import time
 
-from .routes import download, video_info, health, search
-from .config import settings
-from .worker import download_manager
-from .worker.ytdlp_downloader import downloader
-from .errors import (
+# Add backend directory to path for imports
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+from routes import download, video_info, health, search
+from config import settings
+from worker import download_manager
+from worker.ytdlp_downloader import downloader
+from errors import (
     AppException,
     app_exception_handler,
     http_exception_handler,
