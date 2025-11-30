@@ -21,17 +21,28 @@ A full-stack YouTube video and playlist downloader with a modern PWA web interfa
 - **Offline Support** - Service worker caches UI shell
 - **Auto-paste** - Detects YouTube URLs from clipboard
 - **Mobile-first Design** - Optimized for touch devices
-- **Dark Theme** - Easy on the eyes
+- **Dark/Light Theme** - Toggle with one click
 
-### 🎯 Mobile Optimization (Phase 5)
+### 🔍 YouTube Search (No API Key!)
+- Search YouTube directly from the app
+- Uses yt-dlp's ytsearch feature
+- Results cached for 1 hour
+- Click to download any result
+
+### 🎯 Mobile Optimization
 - **Mobile Presets**:
   - Auto Best - Smart selection for your device
   - Mobile Video - 480p MP4 (~50MB/10min)
   - Small Audio - 64kbps MP3 (~5MB/10min)
 - **QR Code Sharing** - Transfer files PC → Mobile instantly
 
+### 📝 Subtitle Support
+- View available subtitle languages
+- Download subtitles separately
+- Embed subtitles into video
+
 ### 🖥️ Web Interface
-- Modern, responsive dark-themed UI
+- Modern, responsive dark/light themed UI
 - Video metadata preview with thumbnail
 - **Format tabs**: Video, Audio, Mobile-optimized
 - Quality selection grid (2160p to 360p)
@@ -39,18 +50,34 @@ A full-stack YouTube video and playlist downloader with a modern PWA web interfa
 - Real-time download progress tracking
 - Download queue management
 - Toast notifications
+- Settings modal with preferences
 
 ### 🔧 API Backend
 - RESTful API built with FastAPI
 - Async download with queue management
-- Rate limiting & CORS protection
+- Metadata caching (1-hour TTL)
+- Rate limiting (30 req/min, 3 downloads/min)
+- CORS protection
 - Comprehensive error handling
-- Server-side logging
+- Server-side logging with rotation
 - Health monitoring endpoint
+
+### 🧪 Testing
+- Backend integration tests (pytest)
+- Frontend E2E tests (Playwright)
+- Lighthouse CI for performance
 
 ### 🎨 Additional Apps
 - **GUI Application** - Tkinter desktop interface
 - **CLI Tool** - Command-line for automation
+
+---
+
+## 📚 Documentation
+
+- [📐 Architecture](docs/ARCHITECTURE.md) - System design and component diagram
+- [⚠️ Known Issues](docs/KNOWN_ISSUES.md) - Limitations and workarounds
+- [📖 API Examples](docs/API_EXAMPLES.md) - cURL, JavaScript, Python examples
 
 ---
 
@@ -119,11 +146,13 @@ videocode/
 │   ├── routes/                 # API endpoints
 │   │   ├── download.py         # Download endpoints
 │   │   ├── video_info.py       # Video info endpoints
+│   │   ├── search.py           # YouTube search & subtitles
 │   │   └── health.py           # Health check
 │   ├── worker/                 # Background workers
 │   │   ├── download_manager.py # Download queue manager
 │   │   └── ytdlp_downloader.py # yt-dlp wrapper
-│   ├── tests/                  # Unit tests
+│   ├── tests/                  # Backend tests
+│   │   └── test_integration.py # Integration tests
 │   ├── main.py                 # FastAPI application
 │   ├── config.py               # Configuration
 │   ├── models.py               # Pydantic models
@@ -133,14 +162,21 @@ videocode/
 │
 ├── frontend/                   # PWA Frontend
 │   ├── css/
-│   │   └── styles.css          # Mobile-first CSS
+│   │   └── styles.css          # Mobile-first CSS (dark/light)
 │   ├── js/
 │   │   ├── api.js              # API client
 │   │   └── app.js              # Main application
+│   ├── tests/                  # Frontend tests
+│   │   └── e2e.spec.js         # Playwright E2E tests
 │   ├── icons/                  # PWA icons
 │   ├── index.html              # Main page
 │   ├── manifest.json           # PWA manifest
 │   └── sw.js                   # Service worker
+│
+├── docs/                       # Documentation
+│   ├── ARCHITECTURE.md         # System architecture
+│   ├── KNOWN_ISSUES.md         # Known issues & workarounds
+│   └── API_EXAMPLES.md         # API usage examples
 │
 ├── .github/
 │   └── workflows/
@@ -150,6 +186,8 @@ videocode/
 ├── youtube_downloader_yt_dlp.py # CLI tool
 │
 ├── docker-compose.yml          # Docker Compose config
+├── playwright.config.js        # Playwright test config
+├── lighthouserc.json           # Lighthouse CI config
 ├── render.yaml                 # Render deployment
 ├── netlify.toml                # Netlify deployment
 ├── vercel.json                 # Vercel deployment
@@ -176,6 +214,9 @@ videocode/
 | POST | `/api/mobile-compression` | Mobile-optimized download |
 | GET | `/api/queue` | Get queue status |
 | DELETE | `/api/queue/clear` | Clear completed |
+| GET | `/api/search?q=&limit=` | Search YouTube videos |
+| GET | `/api/subtitles?url=&lang=` | Download subtitles |
+| GET | `/api/subtitles/available?url=` | List available subtitles |
 
 ### Example API Calls
 
@@ -266,15 +307,53 @@ docker run -p 8000:8000 youtube-downloader-api
 
 ## 🧪 Testing
 
+### Backend Tests
+
 ```bash
-# Run backend tests
+# Install test dependencies
 cd backend
-pip install pytest pytest-asyncio pytest-cov
+pip install pytest pytest-asyncio pytest-cov httpx
+
+# Run integration tests
 pytest tests/ -v --cov=.
 
-# Run linting
+# Run with coverage report
+pytest tests/ -v --cov=. --cov-report=html
+```
+
+### Frontend E2E Tests
+
+```bash
+# Install Playwright
+npm install @playwright/test
+npx playwright install
+
+# Run E2E tests
+npx playwright test
+
+# Run with UI
+npx playwright test --ui
+```
+
+### Lighthouse CI
+
+```bash
+# Install Lighthouse CI
+npm install -g @lhci/cli
+
+# Run audit
+lhci autorun
+```
+
+### Linting
+
+```bash
+# Backend
 flake8 backend --max-line-length=120
 black --check backend
+
+# Frontend
+npx eslint frontend/js
 ```
 
 ---
@@ -340,5 +419,11 @@ This tool is for educational purposes only. Please respect YouTube's Terms of Se
 - [x] Phase 4: PWA support
 - [x] Phase 5: Mobile optimization & QR sharing
 - [x] Phase 6: Error handling & deployment
-- [ ] Phase 7: User accounts & history
-- [ ] Phase 8: Browser extension
+- [x] Phase 7: Frontend polish (theme toggle, settings, progress UI)
+- [x] Phase 8: Backend enhancements (search, subtitles, rate limiting)
+- [x] Phase 9: PWA finalization (service worker caching)
+- [x] Phase 10: Advanced features (YouTube search)
+- [x] Phase 11: Testing (Playwright, Lighthouse CI, integration tests)
+- [x] Phase 12: Documentation (architecture, API examples)
+- [ ] Phase 13: User accounts & history
+- [ ] Phase 14: Browser extension
