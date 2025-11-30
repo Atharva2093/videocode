@@ -1,0 +1,75 @@
+# Netlify Configuration
+# Deploy frontend to Netlify
+
+[build]
+  publish = "frontend"
+  command = "echo 'Static site ready'"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Headers for PWA and security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Redirect API calls to backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://youtube-downloader-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+  headers = {Access-Control-Allow-Origin = "*"}
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Environment-specific redirects for preview deploys
+[context.deploy-preview]
+  [[context.deploy-preview.redirects]]
+    from = "/api/*"
+    to = "https://youtube-downloader-api-staging.onrender.com/api/:splat"
+    status = 200
+    force = true
+
+# Branch deploys
+[context.branch-deploy]
+  [[context.branch-deploy.redirects]]
+    from = "/api/*"
+    to = "https://youtube-downloader-api-staging.onrender.com/api/:splat"
+    status = 200
+    force = true

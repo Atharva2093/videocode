@@ -1,0 +1,62 @@
+# Render Blueprint - render.yaml
+# Deploy to Render.com with one click
+
+services:
+  # Backend API Service
+  - type: web
+    name: youtube-downloader-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install -r backend/requirements.txt
+    startCommand: |
+      cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DEBUG
+        value: "false"
+      - key: DOWNLOAD_DIR
+        value: "/tmp/downloads"
+      - key: TEMP_DIR
+        value: "/tmp/temp"
+      - key: MAX_FILE_SIZE_MB
+        value: "500"
+      - key: MAX_CONCURRENT_DOWNLOADS
+        value: "3"
+      - key: CORS_ORIGINS
+        value: "https://youtube-downloader.vercel.app,https://youtube-downloader.netlify.app"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    
+  # Static Frontend (Optional - Can use Netlify/Vercel instead)
+  - type: web
+    name: youtube-downloader-frontend
+    runtime: static
+    buildCommand: echo "Static files ready"
+    staticPublishPath: ./frontend
+    pullRequestPreviewsEnabled: true
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=31536000
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# Environment Groups
+envVarGroups:
+  - name: production-settings
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
