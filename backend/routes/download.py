@@ -1,9 +1,10 @@
 """
 Download endpoints - Phase 2
 Includes: /download (queue-based), /download/direct, /convert, /mobile-compression
+With streaming file response and mobile browser compatibility
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Response
 from fastapi.responses import FileResponse, StreamingResponse
 import os
 import tempfile
@@ -12,7 +13,9 @@ import asyncio
 import yt_dlp
 import subprocess
 import shutil
+import mimetypes
 from pathlib import Path
+from typing import Generator
 
 from ..models import (
     DownloadRequest, DownloadResponse, DownloadProgress,
@@ -20,16 +23,39 @@ from ..models import (
     DirectDownloadRequest, ConvertRequest, MobileCompressionRequest, AudioQuality
 )
 from ..worker import download_manager
+from ..worker.ytdlp_downloader import downloader, DownloadError
 from ..config import settings
 
 router = APIRouter()
+
+
+# ============== MIME Types for Mobile Compatibility ==============
+
+MIME_TYPES = {
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+    'mkv': 'video/x-matroska',
+    'avi': 'video/x-msvideo',
+    'mov': 'video/quicktime',
+    'mp3': 'audio/mpeg',
+    'm4a': 'audio/mp4',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'flac': 'audio/flac',
+}
+
+
+def get_mime_type(filename: str) -> str:
+    """Get MIME type for file, with fallback for mobile compatibility"""
+    ext = Path(filename).suffix.lower().lstrip('.')
+    return MIME_TYPES.get(ext, 'application/octet-stream')
 
 
 # ============== Helper Functions ==============
 
 def get_temp_dir():
     """Get or create temp directory for downloads"""
-    temp_dir = Path(tempfile.gettempdir()) / "videocode_downloads"
+    temp_dir = Path(settings.TEMP_DIR)
     temp_dir.mkdir(exist_ok=True)
     return temp_dir
 
@@ -59,6 +85,24 @@ def get_quality_format(quality: str, audio_only: bool = False) -> str:
     return quality_map.get(quality, quality_map['best'])
 
 
+def iter_file_chunks(file_path: str, chunk_size: int = None) -> Generator[bytes, None, None]:
+    """Generator to yield file chunks for streaming"""
+    chunk_size = chunk_size or settings.CHUNK_SIZE
+    with open(file_path, 'rb') as f:
+        while chunk := f.read(chunk_size):
+            yield chunk
+
+
+async def cleanup_file_later(file_path: str, delay: int = 300):
+    """Delete file after delay (5 minutes default)"""
+    await asyncio.sleep(delay)
+    try:
+        if os.path.exists(file_path):
+            os.unlink(file_path)
+    except:
+        pass
+
+
 # ============== Queue-Based Download Endpoints ==============
 
 @router.post("/download", response_model=DownloadResponse)
@@ -69,6 +113,10 @@ async def start_download(request: DownloadRequest):
     Adds download to queue and returns task_id for tracking.
     Use GET /download/{task_id} to check status.
     """
+    # Check if playlists are allowed
+    if not settings.ALLOW_PLAYLISTS and ('list=' in request.url or '/playlist?' in request.url):
+        raise HTTPException(status_code=400, detail="Playlist downloads are disabled")
+    
     try:
         task_id = await download_manager.add_download(
             url=request.url,
@@ -131,9 +179,12 @@ async def get_queue_status():
 
 
 @router.get("/download/{task_id}/file")
-async def download_file(task_id: str):
+async def download_file(task_id: str, background_tasks: BackgroundTasks):
     """
-    GET /download/{task_id}/file - Download completed file
+    GET /download/{task_id}/file - Download completed file with streaming
+    
+    Uses chunked streaming for mobile browser compatibility.
+    Sets proper MIME types and Content-Disposition headers.
     """
     task = download_manager.get_task(task_id)
     if not task:
@@ -145,11 +196,33 @@ async def download_file(task_id: str):
     if not task.file_path or not os.path.exists(task.file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
-    filename = os.path.basename(task.file_path)
+    file_path = task.file_path
+    filename = os.path.basename(file_path)
+    file_size = os.path.getsize(file_path)
+    mime_type = get_mime_type(filename)
+    
+    # Use streaming for large files (> 50MB) for better mobile compatibility
+    if file_size > 50 * 1024 * 1024:
+        return StreamingResponse(
+            iter_file_chunks(file_path),
+            media_type=mime_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(file_size),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-cache",
+            }
+        )
+    
+    # Use FileResponse for smaller files
     return FileResponse(
-        path=task.file_path,
+        path=file_path,
         filename=filename,
-        media_type='application/octet-stream'
+        media_type=mime_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache",
+        }
     )
 
 
@@ -165,75 +238,51 @@ async def clear_completed():
 # ============== Direct Download Endpoint ==============
 
 @router.post("/download/direct")
-async def direct_download(request: DirectDownloadRequest):
+async def direct_download(request: DirectDownloadRequest, background_tasks: BackgroundTasks):
     """
     POST /download/direct - Synchronous download returning file directly
     
-    Downloads video/audio and returns the file as a downloadable response.
-    Best for small files or when immediate download is needed.
+    Downloads video/audio and returns the file as a streaming response.
+    Uses chunked transfer for mobile browser compatibility.
     
-    WARNING: This blocks until download is complete. For large files,
-    use the queue-based /download endpoint instead.
+    Features:
+    - Retry logic with configurable attempts
+    - Proper MIME types for mobile browsers
+    - Auto cleanup of temp files
+    - File size validation
     """
     try:
-        temp_dir = get_temp_dir()
-        download_id = str(uuid.uuid4())[:8]
-        
-        # Get video info first for filename
-        ydl_opts_info = {'quiet': True, 'no_warnings': True}
-        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
-            info = ydl.extract_info(request.url, download=False)
-        
-        title = sanitize_filename(info.get('title', 'video'))
-        ext = 'mp3' if request.audio_only else request.format
-        output_path = temp_dir / f"{title}_{download_id}.{ext}"
-        
-        # Configure download options
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'outtmpl': str(temp_dir / f"{title}_{download_id}.%(ext)s"),
-        }
-        
-        if request.audio_only:
-            ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio/best'
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
-            output_path = temp_dir / f"{title}_{download_id}.mp3"
-        else:
-            ydl_opts['format'] = get_quality_format(request.quality)
-            if request.format == 'mp4':
-                ydl_opts['merge_output_format'] = 'mp4'
-        
-        # Perform download
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([request.url])
-        
-        # Find the downloaded file
-        if not output_path.exists():
-            # Search for file with matching pattern
-            for f in temp_dir.glob(f"{title}_{download_id}.*"):
-                output_path = f
-                break
-        
-        if not output_path.exists():
-            raise HTTPException(status_code=500, detail="Download failed - file not found")
-        
-        filename = f"{title}.{output_path.suffix.lstrip('.')}"
-        
-        # Return file and clean up after
-        return FileResponse(
-            path=str(output_path),
-            filename=filename,
-            media_type='application/octet-stream',
-            background=BackgroundTasks().add_task(lambda: output_path.unlink(missing_ok=True))
+        # Use the reusable downloader with retry logic
+        file_path = downloader.download(
+            url=request.url,
+            format=request.format,
+            quality=request.quality,
+            audio_only=request.audio_only,
+            use_temp=True  # Download to temp, then stream
         )
         
-    except yt_dlp.utils.DownloadError as e:
-        raise HTTPException(status_code=400, detail=f"Download failed: {str(e)}")
+        filename = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path)
+        mime_type = get_mime_type(filename)
+        
+        # Schedule cleanup after 5 minutes
+        background_tasks.add_task(cleanup_file_later, file_path, 300)
+        
+        # Use streaming for better mobile compatibility
+        return StreamingResponse(
+            iter_file_chunks(file_path),
+            media_type=mime_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(file_size),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "no-cache",
+                "X-File-Size-MB": f"{file_size / (1024*1024):.2f}",
+            }
+        )
+        
+    except DownloadError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
@@ -241,23 +290,21 @@ async def direct_download(request: DirectDownloadRequest):
 # ============== Convert Endpoint ==============
 
 @router.post("/convert")
-async def convert_video(request: ConvertRequest):
+async def convert_video(request: ConvertRequest, background_tasks: BackgroundTasks):
     """
     POST /convert - Download and convert to specified format
     
     Downloads video and converts to target format (mp3, mp4, webm, etc.)
     Supports custom quality and compression settings.
+    Uses streaming for mobile compatibility.
     """
     try:
         temp_dir = get_temp_dir()
         download_id = str(uuid.uuid4())[:8]
         
-        # Get video info
-        ydl_opts_info = {'quiet': True, 'no_warnings': True}
-        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
-            info = ydl.extract_info(request.url, download=False)
-        
-        title = sanitize_filename(info.get('title', 'video'))
+        # Get video info with retry
+        metadata = downloader.extract_metadata(request.url)
+        title = sanitize_filename(metadata.title)
         
         # Map audio quality to bitrate
         audio_bitrate_map = {
@@ -278,6 +325,7 @@ async def convert_video(request: ConvertRequest):
                 'no_warnings': True,
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': str(temp_dir / f"{title}_{download_id}.%(ext)s"),
+                'retries': settings.MAX_RETRIES,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -292,6 +340,7 @@ async def convert_video(request: ConvertRequest):
                 'format': get_quality_format(request.video_quality or 'best'),
                 'outtmpl': str(output_path),
                 'merge_output_format': request.output_format,
+                'retries': settings.MAX_RETRIES,
             }
             
             # Add compression postprocessor if needed
@@ -301,9 +350,16 @@ async def convert_video(request: ConvertRequest):
                     'preferedformat': request.output_format,
                 }]
         
-        # Download
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([request.url])
+        # Download with retry
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([request.url])
+                break
+            except Exception as e:
+                if attempt == settings.MAX_RETRIES - 1:
+                    raise
+                await asyncio.sleep(settings.RETRY_DELAY_SECONDS)
         
         # Find output file
         if not output_path.exists():
@@ -315,11 +371,22 @@ async def convert_video(request: ConvertRequest):
             raise HTTPException(status_code=500, detail="Conversion failed - file not found")
         
         filename = f"{title}.{request.output_format}"
+        file_size = output_path.stat().st_size
+        mime_type = get_mime_type(filename)
         
-        return FileResponse(
-            path=str(output_path),
-            filename=filename,
-            media_type='application/octet-stream'
+        # Schedule cleanup
+        background_tasks.add_task(cleanup_file_later, str(output_path), 300)
+        
+        # Use streaming for mobile compatibility
+        return StreamingResponse(
+            iter_file_chunks(str(output_path)),
+            media_type=mime_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(file_size),
+                "Accept-Ranges": "bytes",
+                "X-File-Size-MB": f"{file_size / (1024*1024):.2f}",
+            }
         )
         
     except yt_dlp.utils.DownloadError as e:
@@ -331,7 +398,7 @@ async def convert_video(request: ConvertRequest):
 # ============== Mobile Compression Endpoint ==============
 
 @router.post("/mobile-compression")
-async def mobile_compression(request: MobileCompressionRequest):
+async def mobile_compression(request: MobileCompressionRequest, background_tasks: BackgroundTasks):
     """
     POST /mobile-compression - Download with mobile-optimized settings
     
@@ -340,17 +407,15 @@ async def mobile_compression(request: MobileCompressionRequest):
     - Audio: 64kbps MP3 for minimal size
     
     Perfect for saving bandwidth and storage on mobile devices.
+    Uses streaming for mobile browser compatibility.
     """
     try:
         temp_dir = get_temp_dir()
         download_id = str(uuid.uuid4())[:8]
         
-        # Get video info
-        ydl_opts_info = {'quiet': True, 'no_warnings': True}
-        with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
-            info = ydl.extract_info(request.url, download=False)
-        
-        title = sanitize_filename(info.get('title', 'video'))
+        # Get video info with retry
+        metadata = downloader.extract_metadata(request.url)
+        title = sanitize_filename(metadata.title)
         
         # Determine resolution
         resolution = request.max_resolution or '480p'
@@ -365,6 +430,7 @@ async def mobile_compression(request: MobileCompressionRequest):
                 'no_warnings': True,
                 'format': 'bestaudio[ext=m4a]/bestaudio/best',
                 'outtmpl': str(temp_dir / f"{title}_{download_id}_mobile.%(ext)s"),
+                'retries': settings.MAX_RETRIES,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -381,15 +447,23 @@ async def mobile_compression(request: MobileCompressionRequest):
                 'format': f'bestvideo[height<={max_height}]+bestaudio/best[height<={max_height}]',
                 'outtmpl': str(output_path),
                 'merge_output_format': 'mp4',
+                'retries': settings.MAX_RETRIES,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
                 }]
             }
         
-        # Download
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([request.url])
+        # Download with retry
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([request.url])
+                break
+            except Exception as e:
+                if attempt == settings.MAX_RETRIES - 1:
+                    raise
+                await asyncio.sleep(settings.RETRY_DELAY_SECONDS)
         
         # Find output file
         if not output_path.exists():
@@ -405,12 +479,19 @@ async def mobile_compression(request: MobileCompressionRequest):
         file_size_mb = file_size / (1024 * 1024)
         
         filename = f"{title}_mobile.{output_path.suffix.lstrip('.')}"
+        mime_type = get_mime_type(filename)
         
-        return FileResponse(
-            path=str(output_path),
-            filename=filename,
-            media_type='application/octet-stream',
+        # Schedule cleanup
+        background_tasks.add_task(cleanup_file_later, str(output_path), 300)
+        
+        # Use streaming for mobile compatibility
+        return StreamingResponse(
+            iter_file_chunks(str(output_path)),
+            media_type=mime_type,
             headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(file_size),
+                "Accept-Ranges": "bytes",
                 "X-File-Size-MB": f"{file_size_mb:.2f}",
                 "X-Compression-Type": "mobile-optimized"
             }
