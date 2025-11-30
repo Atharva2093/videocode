@@ -3,7 +3,7 @@ YouTube Video Downloader - FastAPI Backend
 Main application entry point
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -15,18 +15,26 @@ from .routes import download, video_info, health
 from .config import settings
 from .worker import download_manager
 from .worker.ytdlp_downloader import downloader
+from .errors import (
+    AppException,
+    app_exception_handler,
+    http_exception_handler,
+    general_exception_handler,
+    log_info,
+    log_error
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler"""
     # Startup
-    print("🚀 Starting YouTube Downloader API...")
-    print(f"📁 Download directory: {settings.DOWNLOAD_DIR}")
-    print(f"📁 Temp directory: {settings.TEMP_DIR}")
-    print(f"🔧 Max concurrent downloads: {settings.MAX_CONCURRENT_DOWNLOADS}")
-    print(f"📦 Max file size: {settings.MAX_FILE_SIZE_MB}MB")
-    print(f"🎬 Allow playlists: {settings.ALLOW_PLAYLISTS}")
+    log_info("🚀 Starting YouTube Downloader API...")
+    log_info(f"📁 Download directory: {settings.DOWNLOAD_DIR}")
+    log_info(f"📁 Temp directory: {settings.TEMP_DIR}")
+    log_info(f"🔧 Max concurrent downloads: {settings.MAX_CONCURRENT_DOWNLOADS}")
+    log_info(f"📦 Max file size: {settings.MAX_FILE_SIZE_MB}MB")
+    log_info(f"🎬 Allow playlists: {settings.ALLOW_PLAYLISTS}")
     
     # Create download directory if it doesn't exist
     os.makedirs(settings.DOWNLOAD_DIR, exist_ok=True)
@@ -41,12 +49,12 @@ async def lifespan(app: FastAPI):
     # Clean up any old temp files on startup
     deleted = downloader.cleanup_temp_files()
     if deleted > 0:
-        print(f"🧹 Cleaned up {deleted} old temp files on startup")
+        log_info(f"🧹 Cleaned up {deleted} old temp files on startup")
     
     yield
     
     # Shutdown
-    print("🛑 Shutting down YouTube Downloader API...")
+    log_info("🛑 Shutting down YouTube Downloader API...")
     await download_manager.stop()
     downloader.stop_cleanup_scheduler()
 
@@ -60,6 +68,11 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
+
+# Register exception handlers
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 # Configure CORS - Restrict to specific domains
 app.add_middleware(
