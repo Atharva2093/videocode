@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0f0f0f">
-    <meta name="description" content="Download YouTube videos and playlists on any device">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="description" content="Download YouTube videos instantly - simple, fast, and free">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="YT Downloader">
+    <meta name="apple-mobile-web-app-title" content="YT Download">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -17,225 +17,182 @@
     <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     
-    <title>YouTube Downloader</title>
+    <title>YouTube Downloader - Simple & Fast</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles-new.css">
     
     <!-- QR Code Library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
-    <!-- App Container -->
     <div id="app" class="app">
-        <!-- Header -->
+        <!-- Minimal Header -->
         <header class="header">
-            <div class="header-content">
-                <div class="logo">
-                    <span class="logo-icon">🎬</span>
-                    <h1>YT Downloader</h1>
-                </div>
-                <div class="header-actions">
-                    <button id="theme-toggle-btn" class="header-btn" onclick="app.toggleTheme()" aria-label="Toggle theme">
-                        <svg id="theme-icon-dark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                        </svg>
-                        <svg id="theme-icon-light" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="5"/>
-                            <line x1="12" y1="1" x2="12" y2="3"/>
-                            <line x1="12" y1="21" x2="12" y2="23"/>
-                        </svg>
-                    </button>
-                    <button id="settings-btn" class="header-btn" onclick="app.openSettingsModal()" aria-label="Settings">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                    </button>
-                    <button id="install-btn" class="install-btn hidden" aria-label="Install App">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span>Install</span>
-                    </button>
-                </div>
+            <div class="logo">
+                <span class="logo-icon">▶</span>
+                <span class="logo-text">YT Download</span>
             </div>
+            <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme">
+                <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                </svg>
+                <svg class="icon-moon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
         </header>
 
         <!-- Main Content -->
         <main class="main">
+            <!-- Hero Section -->
+            <section class="hero">
+                <h1 class="hero-title">Download YouTube Videos</h1>
+                <p class="hero-subtitle">Paste a link, choose format, download. It's that simple.</p>
+            </section>
+
             <!-- URL Input Section -->
             <section class="input-section">
-                <!-- Search/URL Toggle -->
-                <div class="input-mode-toggle">
-                    <button class="input-mode-btn active" data-mode="url" onclick="app.setInputMode('url')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                        </svg>
-                        Paste URL
-                    </button>
-                    <button class="input-mode-btn" data-mode="search" onclick="app.setInputMode('search')">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"/>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        Search YouTube
-                    </button>
-                </div>
+                <div class="input-card">
+                    <div class="input-wrapper">
+                        <input 
+                            type="url" 
+                            id="url-input" 
+                            class="url-input" 
+                            placeholder="Paste YouTube link here..."
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                        >
+                        <button id="paste-btn" class="paste-btn" aria-label="Paste from clipboard">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                            </svg>
+                        </button>
+                        <button id="clear-btn" class="clear-btn hidden" aria-label="Clear">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
 
-                <div class="input-wrapper">
-                    <input 
-                        type="url" 
-                        id="url-input" 
-                        class="url-input" 
-                        placeholder="Paste YouTube URL here..."
-                        autocomplete="off"
-                        autocorrect="off"
-                        autocapitalize="off"
-                        spellcheck="false"
-                        inputmode="url"
-                    >
-                    <button id="paste-btn" class="paste-btn" aria-label="Paste from clipboard">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                        </svg>
-                    </button>
-                    <button id="clear-btn" class="clear-btn hidden" aria-label="Clear input">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Search Results (Hidden by default) -->
-                <div id="search-results" class="search-results hidden"></div>
-                
-                <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <button id="metadata-btn" class="btn btn-secondary btn-large">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="12" y1="16" x2="12" y2="12"/>
-                            <line x1="12" y1="8" x2="12.01" y2="8"/>
-                        </svg>
-                        <span>Get Info</span>
-                    </button>
-                    <button id="download-btn" class="btn btn-primary btn-large" disabled>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span>Download</span>
-                    </button>
+                    <!-- Clipboard Detection Banner -->
+                    <div id="clipboard-banner" class="clipboard-banner hidden">
+                        <span>📋 YouTube link detected in clipboard</span>
+                        <button id="use-clipboard-btn" class="use-clipboard-btn">Use it</button>
+                    </div>
                 </div>
             </section>
 
-            <!-- Preview Section (Hidden by default) -->
+            <!-- Video Preview Section (Hidden by default) -->
             <section id="preview-section" class="preview-section hidden">
-                <!-- Video Card -->
-                <div class="video-card">
-                    <div class="thumbnail-wrapper">
-                        <img id="thumbnail" src="" alt="Video thumbnail" class="thumbnail">
-                        <span id="duration-badge" class="duration-badge"></span>
-                        <div class="thumbnail-overlay">
-                            <button id="thumbnail-play" class="play-btn" aria-label="Preview">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                                    <polygon points="5 3 19 12 5 21 5 3"/>
-                                </svg>
-                            </button>
-                        </div>
+                <div class="preview-card">
+                    <div class="preview-thumbnail">
+                        <img id="thumbnail" src="" alt="Video thumbnail">
+                        <span id="duration" class="duration-badge"></span>
                     </div>
-                    <div class="video-details">
+                    <div class="preview-info">
                         <h2 id="video-title" class="video-title"></h2>
+                        <p id="channel-name" class="channel-name"></p>
                         <div class="video-meta">
-                            <span id="channel-name" class="channel"></span>
-                            <span class="meta-separator">•</span>
-                            <span id="view-count" class="views"></span>
+                            <span id="view-count"></span>
+                            <span class="meta-dot">•</span>
+                            <span id="upload-date"></span>
                         </div>
-                        <p id="video-description" class="video-description"></p>
                     </div>
                 </div>
+            </section>
 
-                <!-- Format Selection -->
-                <div class="format-selection">
-                    <h3>Download Options</h3>
-                    <div class="format-tabs">
-                        <button class="format-tab active" data-format="video">
+            <!-- Main Download Buttons -->
+            <section id="download-buttons" class="download-buttons hidden">
+                <button id="download-mp4" class="download-btn download-btn-primary">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    <span class="btn-text">
+                        <strong>Download MP4</strong>
+                        <small>Best quality video</small>
+                    </span>
+                </button>
+
+                <button id="download-mp3" class="download-btn download-btn-secondary">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 18V5l12-2v13"/>
+                        <circle cx="6" cy="18" r="3"/>
+                        <circle cx="18" cy="16" r="3"/>
+                    </svg>
+                    <span class="btn-text">
+                        <strong>Download MP3</strong>
+                        <small>Audio only</small>
+                    </span>
+                </button>
+
+                <button id="more-options-btn" class="download-btn download-btn-tertiary">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"/>
+                        <circle cx="12" cy="5" r="1"/>
+                        <circle cx="12" cy="19" r="1"/>
+                    </svg>
+                    <span class="btn-text">
+                        <strong>More Options</strong>
+                        <small>Quality, format, subtitles</small>
+                    </span>
+                </button>
+            </section>
+
+            <!-- Advanced Options Panel (Collapsed by default) -->
+            <section id="advanced-panel" class="advanced-panel hidden">
+                <div class="advanced-card">
+                    <div class="advanced-header">
+                        <h3>Advanced Options</h3>
+                        <button id="close-advanced" class="close-btn" aria-label="Close">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                                <line x1="7" y1="2" x2="7" y2="22"/>
-                                <line x1="17" y1="2" x2="17" y2="22"/>
-                                <line x1="2" y1="12" x2="22" y2="12"/>
-                                <line x1="2" y1="7" x2="7" y2="7"/>
-                                <line x1="2" y1="17" x2="7" y2="17"/>
-                                <line x1="17" y1="17" x2="22" y2="17"/>
-                                <line x1="17" y1="7" x2="22" y2="7"/>
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
                             </svg>
-                            Video
-                        </button>
-                        <button class="format-tab" data-format="audio">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 18V5l12-2v13"/>
-                                <circle cx="6" cy="18" r="3"/>
-                                <circle cx="18" cy="16" r="3"/>
-                            </svg>
-                            Audio
-                        </button>
-                        <button class="format-tab" data-format="mobile">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                                <line x1="12" y1="18" x2="12.01" y2="18"/>
-                            </svg>
-                            Mobile
                         </button>
                     </div>
 
-                    <!-- Mobile Presets (shown when Mobile tab is active) -->
-                    <div id="mobile-presets" class="mobile-presets hidden">
-                        <label class="quality-label">Mobile Presets</label>
-                        <div class="preset-grid">
-                            <button class="preset-btn active" data-preset="auto">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="3"/>
-                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    <!-- Format Selection -->
+                    <div class="option-group">
+                        <label class="option-label">Format</label>
+                        <div class="format-tabs">
+                            <button class="format-tab active" data-format="video">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="23 7 16 12 23 17 23 7"/>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                                 </svg>
-                                <span class="preset-name">Auto Best</span>
-                                <span class="preset-desc">Smart selection for your device</span>
+                                Video
                             </button>
-                            <button class="preset-btn" data-preset="mobile-video">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                                    <line x1="12" y1="18" x2="12.01" y2="18"/>
-                                </svg>
-                                <span class="preset-name">Mobile Video</span>
-                                <span class="preset-desc">480p MP4 • ~50MB/10min</span>
-                            </button>
-                            <button class="preset-btn" data-preset="mobile-audio">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button class="format-tab" data-format="audio">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M9 18V5l12-2v13"/>
                                     <circle cx="6" cy="18" r="3"/>
                                     <circle cx="18" cy="16" r="3"/>
                                 </svg>
-                                <span class="preset-name">Small Audio</span>
-                                <span class="preset-desc">64kbps MP3 • ~5MB/10min</span>
+                                Audio
                             </button>
                         </div>
                     </div>
 
-                    <!-- Quality Options -->
-                    <div id="quality-options" class="quality-options">
-                        <label class="quality-label">Quality</label>
+                    <!-- Quality Selection -->
+                    <div class="option-group" id="quality-group">
+                        <label class="option-label">Quality</label>
                         <div class="quality-grid" id="quality-grid">
                             <button class="quality-btn active" data-quality="best">Best</button>
                             <button class="quality-btn" data-quality="1080p">1080p</button>
@@ -245,99 +202,134 @@
                         </div>
                     </div>
 
-                    <!-- Available Formats (Collapsible) -->
-                    <details id="formats-details" class="formats-details">
-                        <summary>
-                            <span>Available Formats</span>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="6 9 12 15 18 9"/>
-                            </svg>
-                        </summary>
-                        <div id="formats-list" class="formats-list"></div>
-                    </details>
-
-                    <!-- Subtitle Selection -->
-                    <div id="subtitle-section" class="subtitle-section hidden">
-                        <label class="quality-label">Subtitles</label>
-                        <div class="subtitle-controls">
-                            <select id="subtitle-select" class="subtitle-select">
-                                <option value="">No subtitles</option>
-                            </select>
-                            <label class="subtitle-merge-label">
-                                <input type="checkbox" id="subtitle-merge">
-                                Embed in video
-                            </label>
+                    <!-- Audio Quality -->
+                    <div class="option-group hidden" id="audio-quality-group">
+                        <label class="option-label">Audio Quality</label>
+                        <div class="quality-grid" id="audio-quality-grid">
+                            <button class="quality-btn active" data-quality="320kbps">320kbps</button>
+                            <button class="quality-btn" data-quality="256kbps">256kbps</button>
+                            <button class="quality-btn" data-quality="192kbps">192kbps</button>
+                            <button class="quality-btn" data-quality="128kbps">128kbps</button>
                         </div>
                     </div>
-                </div>
-            </section>
 
-            <!-- Playlist Section (Hidden by default) -->
-            <section id="playlist-section" class="playlist-section hidden">
-                <div class="playlist-header">
-                    <div class="playlist-info">
-                        <h3 id="playlist-title">Playlist</h3>
-                        <span id="playlist-count" class="playlist-count">0 videos</span>
+                    <!-- Subtitles -->
+                    <div class="option-group" id="subtitle-group">
+                        <label class="option-label">Subtitles</label>
+                        <select id="subtitle-select" class="select-input">
+                            <option value="">No subtitles</option>
+                        </select>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="embed-subtitles">
+                            <span>Embed subtitles in video</span>
+                        </label>
                     </div>
-                    <div class="playlist-actions">
-                        <button id="select-all-btn" class="btn btn-small btn-secondary">Select All</button>
-                        <button id="deselect-all-btn" class="btn btn-small btn-ghost">Unselect All</button>
-                        <span id="selected-count" class="selected-count">0 selected</span>
-                    </div>
-                </div>
-                <div id="playlist-container" class="playlist-container"></div>
-                <div class="playlist-batch-actions">
-                    <button id="batch-download-btn" class="btn btn-primary btn-large" onclick="app.startBatchDownload()">
+
+                    <!-- Download Button in Advanced -->
+                    <button id="advanced-download-btn" class="btn-download-advanced">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
-                        Download Selected
+                        Download with these settings
                     </button>
                 </div>
             </section>
 
-            <!-- Download Queue Section -->
-            <section id="queue-section" class="queue-section">
-                <div class="queue-header">
-                    <h3>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        Downloads
-                    </h3>
-                    <button id="clear-queue-btn" class="btn btn-small btn-ghost">Clear</button>
+            <!-- Processing Status -->
+            <section id="status-section" class="status-section hidden">
+                <div class="status-card">
+                    <div class="status-animation">
+                        <div class="spinner"></div>
+                    </div>
+                    <h3 id="status-title">Processing...</h3>
+                    <p id="status-message">Fetching video information</p>
+                    <div class="progress-container hidden" id="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-info">
+                            <span id="progress-percent">0%</span>
+                            <span id="progress-eta">Estimating...</span>
+                        </div>
+                    </div>
+                    <button id="cancel-btn" class="cancel-btn">Cancel</button>
                 </div>
-                <div id="queue-container" class="queue-container">
-                    <div class="queue-empty">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
+            </section>
+
+            <!-- Download Ready Section -->
+            <section id="ready-section" class="ready-section hidden">
+                <div class="ready-card">
+                    <div class="ready-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                            <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                    </div>
+                    <h3>Your download is ready!</h3>
+                    <p id="ready-filename" class="ready-filename"></p>
+                    <p id="ready-filesize" class="ready-filesize"></p>
+                    
+                    <div class="ready-actions">
+                        <a id="download-link" href="#" class="btn-tap-download" download>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Tap to Download
+                        </a>
+                        <button id="retry-download-btn" class="btn-retry">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 4 23 10 17 10"/>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                            </svg>
+                            Retry
+                        </button>
+                        <button id="qr-share-btn" class="btn-qr">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                                <rect x="14" y="14" width="3" height="3"/>
+                            </svg>
+                            Share QR
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Download History -->
+            <section id="history-section" class="history-section">
+                <div class="history-header">
+                    <h3>Recent Downloads</h3>
+                    <button id="clear-history-btn" class="clear-history-btn hidden">Clear</button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <div class="history-empty">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
                         </svg>
                         <p>No downloads yet</p>
-                        <span>Paste a YouTube URL to get started</span>
                     </div>
                 </div>
             </section>
         </main>
 
-        <!-- Sticky Bottom Action Bar (Mobile) -->
-        <div id="bottom-bar" class="bottom-bar hidden">
-            <div class="bottom-bar-info">
-                <span id="bottom-bar-title" class="bottom-title"></span>
-                <span id="bottom-bar-size" class="bottom-size"></span>
+        <!-- Mobile Sticky Download Bar -->
+        <div id="mobile-bar" class="mobile-bar hidden">
+            <div class="mobile-bar-info">
+                <span id="mobile-bar-title"></span>
             </div>
-            <button id="bottom-download-btn" class="btn btn-primary">
+            <button id="mobile-download-btn" class="mobile-download-btn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Download Now
+                Download
             </button>
         </div>
 
@@ -345,10 +337,16 @@
         <footer class="footer">
             <div class="footer-content">
                 <div class="api-status">
-                    <span id="api-status" class="status-dot"></span>
-                    <span id="api-status-text">Connecting...</span>
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="status-text">Connecting...</span>
                 </div>
-                <span class="footer-version">v2.0</span>
+                <button id="settings-btn" class="settings-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Settings
+                </button>
             </div>
         </footer>
     </div>
@@ -356,74 +354,45 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="loading-spinner"></div>
-        <p id="loading-text">Loading...</p>
-    </div>
-
-    <!-- Download Progress Overlay -->
-    <div id="progress-overlay" class="progress-overlay hidden">
-        <div class="progress-content">
-            <div class="progress-icon" id="progress-icon">
-                <div class="progress-spinner"></div>
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="app.closeErrorModal()"></div>
+        <div class="modal-content error-modal-content">
+            <div class="error-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
             </div>
-            <h3 id="progress-title">Preparing Download</h3>
-            <p id="progress-subtitle">Fetching video information...</p>
-            <div class="progress-bar-container">
-                <div class="progress-bar" id="progress-bar">
-                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
-                </div>
-                <span class="progress-percent" id="progress-percent">0%</span>
+            <h3 id="error-title">Oops!</h3>
+            <p id="error-message">Something went wrong. Please try again.</p>
+            <div class="error-actions">
+                <button id="error-retry-btn" class="btn-error-retry">Try Again</button>
+                <button id="error-close-btn" class="btn-error-close" onclick="app.closeErrorModal()">Close</button>
             </div>
-            <div class="progress-details" id="progress-details">
-                <span id="progress-speed"></span>
-                <span id="progress-eta"></span>
-            </div>
-            <button id="progress-cancel-btn" class="btn btn-ghost btn-small">Cancel</button>
         </div>
     </div>
 
-    <!-- Download Complete Modal -->
-    <div id="complete-modal" class="modal hidden">
-        <div class="modal-backdrop" onclick="app.closeCompleteModal()"></div>
-        <div class="modal-content complete-modal-content">
+    <!-- QR Modal -->
+    <div id="qr-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="app.closeQRModal()"></div>
+        <div class="modal-content qr-modal-content">
             <div class="modal-header">
-                <h3>✅ Download Complete</h3>
-                <button class="modal-close" onclick="app.closeCompleteModal()" aria-label="Close">
+                <h3>📱 Transfer to Phone</h3>
+                <button class="modal-close" onclick="app.closeQRModal()" aria-label="Close">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"/>
                         <line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
                 </button>
             </div>
-            <div class="modal-body complete-modal-body">
-                <div class="complete-icon">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                </div>
-                <p class="complete-filename" id="complete-filename">video.mp4</p>
-                <p class="complete-filesize" id="complete-filesize">125.3 MB</p>
-                <div class="complete-actions">
-                    <a id="complete-download-link" href="#" class="btn btn-primary" download>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/>
-                            <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        Save to Device
-                    </a>
-                    <button id="complete-share-btn" class="btn btn-secondary" onclick="app.shareCompletedDownload()">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="3" height="3"></rect>
-                        </svg>
-                        Share QR
-                    </button>
+            <div class="qr-body">
+                <div id="qr-code" class="qr-code"></div>
+                <p class="qr-instructions">Scan with your phone camera to download</p>
+                <div class="qr-url-row">
+                    <input id="qr-url" type="text" class="qr-url-input" readonly>
+                    <button id="copy-url-btn" class="btn-copy-url">Copy</button>
                 </div>
             </div>
         </div>
@@ -442,147 +411,34 @@
                     </svg>
                 </button>
             </div>
-            <div class="modal-body settings-modal-body">
+            <div class="settings-body">
                 <div class="settings-group">
                     <label class="settings-label">Theme</label>
-                    <div class="settings-toggle-group">
-                        <button class="settings-toggle-btn active" data-theme="dark" onclick="app.setTheme('dark')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                            </svg>
-                            Dark
-                        </button>
-                        <button class="settings-toggle-btn" data-theme="light" onclick="app.setTheme('light')">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="5"/>
-                                <line x1="12" y1="1" x2="12" y2="3"/>
-                                <line x1="12" y1="21" x2="12" y2="23"/>
-                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                                <line x1="1" y1="12" x2="3" y2="12"/>
-                                <line x1="21" y1="12" x2="23" y2="12"/>
-                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                            </svg>
-                            Light
-                        </button>
+                    <div class="theme-toggle-group">
+                        <button class="theme-btn active" data-theme="dark">🌙 Dark</button>
+                        <button class="theme-btn" data-theme="light">☀️ Light</button>
                     </div>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label">Default Format</label>
-                    <select id="settings-format" class="settings-select" onchange="app.saveSettings()">
-                        <option value="video">Video (MP4)</option>
-                        <option value="audio">Audio (MP3)</option>
-                        <option value="mobile">Mobile Optimized</option>
-                    </select>
-                </div>
-                <div class="settings-group">
                     <label class="settings-label">Default Quality</label>
-                    <select id="settings-quality" class="settings-select" onchange="app.saveSettings()">
+                    <select id="default-quality" class="select-input">
                         <option value="best">Best Available</option>
                         <option value="1080p">1080p</option>
                         <option value="720p">720p</option>
                         <option value="480p">480p</option>
-                        <option value="360p">360p</option>
                     </select>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label">
-                        <input type="checkbox" id="settings-mobile-presets" onchange="app.saveSettings()">
-                        Show mobile presets
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="auto-paste" checked>
+                        <span>Auto-detect clipboard URLs</span>
                     </label>
                 </div>
                 <div class="settings-group">
-                    <label class="settings-label">
-                        <input type="checkbox" id="settings-qr-sharing" checked onchange="app.saveSettings()">
-                        Enable QR code sharing
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="save-history" checked>
+                        <span>Save download history</span>
                     </label>
-                </div>
-                <div class="settings-group">
-                    <label class="settings-label">
-                        <input type="checkbox" id="settings-auto-download" onchange="app.saveSettings()">
-                        Auto-download when ready
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Download Modal -->
-    <div id="download-modal" class="modal hidden">
-        <div class="modal-backdrop"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Download Ready</h3>
-                <button class="modal-close" aria-label="Close">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="download-ready-icon">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                </div>
-                <p id="modal-filename" class="modal-filename"></p>
-                <p id="modal-filesize" class="modal-filesize"></p>
-            </div>
-            <div class="modal-actions">
-                <a id="modal-download-link" href="#" class="btn btn-primary btn-large" download>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Save to Device
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- Offline Banner -->
-    <div id="offline-banner" class="offline-banner hidden">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="1" y1="1" x2="23" y2="23"/>
-            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-            <path d="M10.71 5.05A16 16 0 0 1 22.58 9"/>
-            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-            <line x1="12" y1="20" x2="12.01" y2="20"/>
-        </svg>
-        <span>You're offline. Some features may be unavailable.</span>
-    </div>
-
-    <!-- QR Code Modal -->
-    <div id="qr-modal" class="modal hidden">
-        <div class="modal-backdrop" onclick="app.closeQRModal()"></div>
-        <div class="modal-content qr-modal-content">
-            <div class="modal-header">
-                <h3>📱 Transfer to Mobile</h3>
-                <button class="modal-close" onclick="app.closeQRModal()" aria-label="Close">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body qr-modal-body">
-                <div id="qr-code" class="qr-code-container"></div>
-                <p class="qr-instructions">Scan this QR code with your phone to download the file directly</p>
-                <div class="qr-url-container">
-                    <input id="qr-url-input" type="text" class="qr-url-input" readonly>
-                    <button id="copy-url-btn" class="btn btn-small btn-secondary" onclick="app.copyDownloadURL()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                        Copy
-                    </button>
                 </div>
             </div>
         </div>
@@ -590,14 +446,14 @@
 
     <!-- Scripts -->
     <script src="js/api.js"></script>
-    <script src="js/app.js"></script>
+    <script src="js/app-new.js"></script>
     <script>
         // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('SW registered:', reg.scope))
-                    .catch(err => console.log('SW registration failed:', err));
+                    .then(reg => console.log('SW registered'))
+                    .catch(err => console.log('SW registration failed'));
             });
         }
     </script>

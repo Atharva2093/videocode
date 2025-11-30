@@ -308,6 +308,23 @@ class APIClient {
         }
         return this.getMetadata(url);
     }
+
+    /**
+     * Get task status - for polling download progress
+     * @param {string} taskId - Task ID from startDownload
+     * @returns {Object} Task status with progress, status, etc.
+     */
+    async getTaskStatus(taskId) {
+        return this.getDownloadStatus(taskId);
+    }
+
+    /**
+     * Cancel task
+     * @param {string} taskId - Task ID to cancel
+     */
+    async cancelTask(taskId) {
+        return this.cancelDownload(taskId);
+    }
 }
 
 // Export singleton instance
