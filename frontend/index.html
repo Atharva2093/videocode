@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎬 YouTube Video Downloader</h1>
+            <p class="subtitle">Download videos and playlists in various formats</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- URL Input Section -->
+            <section class="input-section">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="url-input" 
+                        class="url-input" 
+                        placeholder="Paste YouTube URL here..."
+                        autocomplete="off"
+                    >
+                    <button id="preview-btn" class="btn btn-secondary">
+                        <span class="btn-icon">🔍</span>
+                        Preview
+                    </button>
+                    <button id="download-btn" class="btn btn-primary">
+                        <span class="btn-icon">⬇️</span>
+                        Download
+                    </button>
+                </div>
+            </section>
+
+            <!-- Video Preview Section (Hidden by default) -->
+            <section id="preview-section" class="preview-section hidden">
+                <div class="preview-card">
+                    <div class="thumbnail-container">
+                        <img id="thumbnail" src="" alt="Video Thumbnail" class="thumbnail">
+                        <span id="duration-badge" class="duration-badge"></span>
+                    </div>
+                    <div class="video-info">
+                        <h2 id="video-title" class="video-title"></h2>
+                        <p id="channel-name" class="channel-name"></p>
+                        <div class="video-stats">
+                            <span id="view-count" class="stat"></span>
+                            <span id="upload-date" class="stat"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Playlist Section (Hidden by default) -->
+                <div id="playlist-section" class="playlist-section hidden">
+                    <div class="playlist-header">
+                        <h3>Playlist Videos (<span id="playlist-count">0</span>)</h3>
+                        <div class="playlist-controls">
+                            <button id="select-all-btn" class="btn btn-small">Select All</button>
+                            <button id="deselect-all-btn" class="btn btn-small">Deselect All</button>
+                            <span id="selected-count" class="selected-count">0 selected</span>
+                        </div>
+                    </div>
+                    <div id="playlist-container" class="playlist-container"></div>
+                </div>
+
+                <!-- Format Options -->
+                <div class="format-options">
+                    <div class="option-group">
+                        <label for="format-select">Format</label>
+                        <select id="format-select" class="select-input">
+                            <option value="mp4">MP4 (Video)</option>
+                            <option value="webm">WebM (Video)</option>
+                            <option value="audio">MP3 (Audio Only)</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label for="quality-select">Quality</label>
+                        <select id="quality-select" class="select-input">
+                            <option value="best">Best</option>
+                            <option value="1080p">1080p</option>
+                            <option value="720p">720p</option>
+                            <option value="480p">480p</option>
+                            <option value="360p">360p</option>
+                            <option value="worst">Lowest</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Available Formats Table -->
+                <div id="formats-section" class="formats-section hidden">
+                    <h3>Available Formats</h3>
+                    <div class="formats-table-container">
+                        <table id="formats-table" class="formats-table">
+                            <thead>
+                                <tr>
+                                    <th>Format</th>
+                                    <th>Resolution</th>
+                                    <th>Extension</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody id="formats-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Download Queue Section -->
+            <section class="queue-section">
+                <div class="queue-header">
+                    <h3>📥 Download Queue</h3>
+                    <div class="queue-controls">
+                        <button id="clear-completed-btn" class="btn btn-small btn-secondary">Clear Completed</button>
+                    </div>
+                </div>
+                <div id="queue-container" class="queue-container">
+                    <div class="queue-empty">
+                        <p>No downloads in queue</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Built with ❤️ using FastAPI & yt-dlp</p>
+            <div class="api-status">
+                <span id="api-status-indicator" class="status-indicator"></span>
+                <span id="api-status-text">Checking API...</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

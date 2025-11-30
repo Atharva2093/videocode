@@ -1,0 +1,18 @@
+# YouTube Video Downloader - Backend Dependencies
+
+# FastAPI and server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.6
+
+# YouTube downloading
+yt-dlp>=2023.11.0
+
+# Async support
+aiofiles>=23.2.1
+httpx>=0.25.0
+
+# Optional: for better performance
+orjson>=3.9.0
