@@ -399,22 +399,9 @@ async def get_video_info(request: VideoInfoRequest):
 @router.get("/formats/{video_id}")
 async def get_video_formats(video_id: str):
     """
-    GET /formats/{video_id} - Get available formats for a video by ID
-    """
-    url = f"https://www.youtube.com/watch?v={video_id}"
-    return await get_metadata(url=url)
-        
-    except yt_dlp.utils.DownloadError as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch video info: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
-
-
-@router.get("/formats/{video_id}")
-async def get_video_formats(video_id: str):
-    """
     Get available formats for a video by ID
     """
     url = f"https://www.youtube.com/watch?v={video_id}"
     request = VideoInfoRequest(url=url)
     return await get_video_info(request)
+
