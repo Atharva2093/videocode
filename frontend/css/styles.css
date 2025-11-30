@@ -1,11 +1,12 @@
 /* ==========================================
    YouTube Downloader - Mobile-First CSS
    Phase 3: Responsive Web UI + Dark Theme
+   Phase 7: UI Polish + Light Theme Support
    ========================================== */
 
 /* CSS Variables */
 :root {
-    /* Colors - Dark Theme */
+    /* Colors - Dark Theme (Default) */
     --color-bg: #0f0f0f;
     --color-surface: #1a1a1a;
     --color-surface-hover: #252525;
@@ -74,6 +75,25 @@
     --z-modal: 300;
     --z-toast: 400;
     --z-loading: 500;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+    --color-bg: #f5f5f5;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f0f0f0;
+    --color-surface-active: #e5e5e5;
+    --color-border: #dddddd;
+    --color-border-light: #cccccc;
+    
+    --color-text: #1a1a1a;
+    --color-text-secondary: #666666;
+    --color-text-muted: #999999;
+    
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.15);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.2);
 }
 
 /* Reset */
@@ -145,6 +165,31 @@ body {
     font-size: var(--font-size-lg);
     font-weight: 700;
     white-space: nowrap;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.header-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.header-btn:hover {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text);
 }
 
 .install-btn {
@@ -1518,4 +1563,463 @@ body {
         background: white;
         color: black;
     }
+}
+
+/* ==========================================
+   Input Mode Toggle (Phase 10)
+   ========================================== */
+.input-mode-toggle {
+    display: flex;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.input-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.input-mode-btn:hover {
+    background-color: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+.input-mode-btn.active {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+/* Search Results */
+.search-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: var(--space-md);
+    padding: var(--space-md);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+}
+
+.search-result-item {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    background-color: var(--color-surface-hover);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.search-result-item:hover {
+    background-color: var(--color-surface-active);
+}
+
+.search-result-thumb {
+    width: 120px;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+
+.search-result-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.search-result-title {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.search-result-channel {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.search-result-meta {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.search-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-xl);
+    color: var(--color-text-secondary);
+}
+
+/* ==========================================
+   Download Progress Overlay (Phase 7)
+   ========================================== */
+.progress-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-loading);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(15, 15, 15, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.progress-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: var(--space-xl);
+    max-width: 400px;
+    width: 90%;
+}
+
+.progress-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: var(--space-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.progress-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid var(--color-surface);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.progress-icon.success .progress-spinner {
+    display: none;
+}
+
+.progress-icon.success::after {
+    content: '✓';
+    font-size: 48px;
+    color: var(--color-success);
+}
+
+.progress-content h3 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+}
+
+#progress-subtitle {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-lg);
+}
+
+.progress-bar-container {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.progress-bar {
+    flex: 1;
+    height: 8px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), #ff6b6b);
+    border-radius: var(--radius-full);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-percent {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+    min-width: 45px;
+}
+
+.progress-details {
+    display: flex;
+    gap: var(--space-lg);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-lg);
+}
+
+/* ==========================================
+   Complete Modal (Phase 7)
+   ========================================== */
+.complete-modal-content {
+    max-width: 380px;
+}
+
+.complete-modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.complete-icon {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-success-bg);
+    border-radius: 50%;
+    color: var(--color-success);
+    margin-bottom: var(--space-lg);
+}
+
+.complete-filename {
+    font-weight: 600;
+    font-size: var(--font-size-md);
+    margin-bottom: var(--space-sm);
+    word-break: break-word;
+}
+
+.complete-filesize {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-lg);
+}
+
+.complete-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    width: 100%;
+}
+
+.complete-actions .btn {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ==========================================
+   Settings Modal (Phase 7)
+   ========================================== */
+.settings-modal-content {
+    max-width: 400px;
+}
+
+.settings-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    padding: var(--space-md);
+}
+
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.settings-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.settings-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--color-primary);
+}
+
+.settings-toggle-group {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.settings-toggle-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background-color: var(--color-surface-hover);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.settings-toggle-btn:hover {
+    background-color: var(--color-surface-active);
+}
+
+.settings-toggle-btn.active {
+    background-color: var(--color-primary-light);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.settings-select {
+    width: 100%;
+    padding: var(--space-md);
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.settings-select option {
+    background-color: var(--color-surface);
+}
+
+/* ==========================================
+   Subtitle Section (Phase 8)
+   ========================================== */
+.subtitle-section {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+}
+
+.subtitle-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.subtitle-select {
+    flex: 1;
+    min-width: 150px;
+    padding: var(--space-sm) var(--space-md);
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+}
+
+.subtitle-select option {
+    background-color: var(--color-surface);
+}
+
+.subtitle-merge-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.subtitle-merge-label input {
+    accent-color: var(--color-primary);
+}
+
+/* ==========================================
+   Playlist Batch Actions (Phase 7)
+   ========================================== */
+.playlist-batch-actions {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--color-border);
+}
+
+.playlist-batch-actions .btn {
+    width: 100%;
+}
+
+/* ==========================================
+   Thumbnail Enhancements (Phase 7)
+   ========================================== */
+.thumbnail-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: var(--color-surface-active);
+    overflow: hidden;
+}
+
+.thumbnail-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: inherit;
+    filter: blur(20px) brightness(0.5);
+    transform: scale(1.1);
+    z-index: 0;
+}
+
+.thumbnail {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+    transition: transform var(--transition-normal);
+}
+
+.thumbnail-wrapper:hover .thumbnail {
+    transform: scale(1.05);
+}
+
+.channel-badge {
+    position: absolute;
+    top: var(--space-sm);
+    left: var(--space-sm);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: 4px 8px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    color: white;
+}
+
+.duration-badge {
+    position: absolute;
+    bottom: var(--space-sm);
+    right: var(--space-sm);
+    z-index: 2;
+    padding: 2px 6px;
+    background-color: rgba(0, 0, 0, 0.85);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: white;
 }

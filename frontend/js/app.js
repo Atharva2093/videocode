@@ -1,6 +1,7 @@
 /**
  * YouTube Downloader - Main Application
  * Phase 3-5: Mobile-first responsive UI + Mobile Optimization
+ * Phase 7-10: UI Polish, Settings, Search, Progress
  */
 
 class App {
@@ -10,10 +11,17 @@ class App {
         this.selectedPlaylistItems = new Set();
         this.activeTasks = new Map();
         this.pollInterval = null;
+        this.currentDownloadTaskId = null;
+        
+        // Input mode
+        this.inputMode = 'url'; // 'url' or 'search'
+        
+        // Settings (loaded from localStorage)
+        this.settings = this.loadSettings();
         
         // Settings
-        this.currentFormat = 'video'; // video, audio, mobile
-        this.currentQuality = '1080p';
+        this.currentFormat = this.settings.defaultFormat || 'video'; // video, audio, mobile
+        this.currentQuality = this.settings.defaultQuality || '1080p';
         this.currentMobilePreset = 'auto'; // auto, mobile-video, mobile-audio
         this.audioQualities = ['320kbps', '256kbps', '192kbps', '128kbps'];
         this.videoQualities = ['2160p', '1440p', '1080p', '720p', '480p', '360p'];
@@ -28,6 +36,71 @@ class App {
         this.checkAPIStatus();
         this.startQueuePolling();
         this.setupPasteFromClipboard();
+        this.applyTheme(this.settings.theme || 'dark');
+        this.applySettings();
+    }
+
+    loadSettings() {
+        try {
+            const saved = localStorage.getItem('yt-downloader-settings');
+            return saved ? JSON.parse(saved) : {
+                theme: 'dark',
+                defaultFormat: 'video',
+                defaultQuality: '1080p',
+                showMobilePresets: true,
+                enableQRSharing: true,
+                autoDownload: false
+            };
+        } catch {
+            return {
+                theme: 'dark',
+                defaultFormat: 'video',
+                defaultQuality: '1080p',
+                showMobilePresets: true,
+                enableQRSharing: true,
+                autoDownload: false
+            };
+        }
+    }
+
+    saveSettings() {
+        const formatSelect = document.getElementById('settings-format');
+        const qualitySelect = document.getElementById('settings-quality');
+        const mobilePresetsCheckbox = document.getElementById('settings-mobile-presets');
+        const qrSharingCheckbox = document.getElementById('settings-qr-sharing');
+        const autoDownloadCheckbox = document.getElementById('settings-auto-download');
+
+        this.settings = {
+            ...this.settings,
+            defaultFormat: formatSelect?.value || 'video',
+            defaultQuality: qualitySelect?.value || '1080p',
+            showMobilePresets: mobilePresetsCheckbox?.checked ?? true,
+            enableQRSharing: qrSharingCheckbox?.checked ?? true,
+            autoDownload: autoDownloadCheckbox?.checked ?? false
+        };
+
+        localStorage.setItem('yt-downloader-settings', JSON.stringify(this.settings));
+        this.showToast('Settings saved', 'success');
+    }
+
+    applySettings() {
+        // Apply settings to UI
+        const formatSelect = document.getElementById('settings-format');
+        const qualitySelect = document.getElementById('settings-quality');
+        const mobilePresetsCheckbox = document.getElementById('settings-mobile-presets');
+        const qrSharingCheckbox = document.getElementById('settings-qr-sharing');
+        const autoDownloadCheckbox = document.getElementById('settings-auto-download');
+
+        if (formatSelect) formatSelect.value = this.settings.defaultFormat;
+        if (qualitySelect) qualitySelect.value = this.settings.defaultQuality;
+        if (mobilePresetsCheckbox) mobilePresetsCheckbox.checked = this.settings.showMobilePresets;
+        if (qrSharingCheckbox) qrSharingCheckbox.checked = this.settings.enableQRSharing;
+        if (autoDownloadCheckbox) autoDownloadCheckbox.checked = this.settings.autoDownload;
+
+        // Apply theme buttons
+        document.querySelectorAll('.settings-toggle-btn[data-theme]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === this.settings.theme);
+        });
     }
 
     bindElements() {
@@ -100,18 +173,51 @@ class App {
         this.loadingText = document.getElementById('loading-text');
         this.toastContainer = document.getElementById('toast-container');
         
+        // Progress overlay
+        this.progressOverlay = document.getElementById('progress-overlay');
+        this.progressTitle = document.getElementById('progress-title');
+        this.progressSubtitle = document.getElementById('progress-subtitle');
+        this.progressBar = document.getElementById('progress-bar-fill');
+        this.progressPercent = document.getElementById('progress-percent');
+        this.progressSpeed = document.getElementById('progress-speed');
+        this.progressEta = document.getElementById('progress-eta');
+        this.progressCancelBtn = document.getElementById('progress-cancel-btn');
+        
+        // Complete modal
+        this.completeModal = document.getElementById('complete-modal');
+        this.completeFilename = document.getElementById('complete-filename');
+        this.completeFilesize = document.getElementById('complete-filesize');
+        this.completeDownloadLink = document.getElementById('complete-download-link');
+        
+        // Settings modal
+        this.settingsModal = document.getElementById('settings-modal');
+        
+        // Search results
+        this.searchResults = document.getElementById('search-results');
+        
         // Offline banner
         this.offlineBanner = document.getElementById('offline-banner');
 
         // Install button
         this.installBtn = document.getElementById('install-btn');
+        
+        // Subtitle elements
+        this.subtitleSection = document.getElementById('subtitle-section');
+        this.subtitleSelect = document.getElementById('subtitle-select');
+        this.subtitleMerge = document.getElementById('subtitle-merge');
     }
 
     bindEvents() {
         // URL input events
         this.urlInput?.addEventListener('input', () => this.handleUrlInput());
         this.urlInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.handlePreview();
+            if (e.key === 'Enter') {
+                if (this.inputMode === 'search') {
+                    this.handleSearch();
+                } else {
+                    this.handlePreview();
+                }
+            }
         });
 
         // Button clicks
@@ -121,6 +227,9 @@ class App {
         this.downloadBtn?.addEventListener('click', () => this.handleDownload());
         this.bottomDownloadBtn?.addEventListener('click', () => this.handleDownload());
         this.clearCompletedBtn?.addEventListener('click', () => this.handleClearCompleted());
+        
+        // Progress cancel button
+        this.progressCancelBtn?.addEventListener('click', () => this.cancelCurrentDownload());
 
         // Format tabs
         this.formatTabs?.forEach(tab => {
@@ -146,6 +255,15 @@ class App {
         // Online/Offline events
         window.addEventListener('online', () => this.handleOnline());
         window.addEventListener('offline', () => this.handleOffline());
+        
+        // Metadata button
+        document.getElementById('metadata-btn')?.addEventListener('click', () => {
+            if (this.inputMode === 'search') {
+                this.handleSearch();
+            } else {
+                this.handlePreview();
+            }
+        });
     }
 
     setupPasteFromClipboard() {
@@ -706,6 +824,283 @@ class App {
                 window.deferredPrompt = null;
             });
         }
+    }
+
+    // ==========================================
+    // Theme Methods
+    // ==========================================
+    
+    setTheme(theme) {
+        this.settings.theme = theme;
+        localStorage.setItem('yt-downloader-settings', JSON.stringify(this.settings));
+        this.applyTheme(theme);
+        
+        // Update theme toggle buttons
+        document.querySelectorAll('.settings-toggle-btn[data-theme]').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+    }
+    
+    applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        
+        // Update theme icons in header
+        const darkIcon = document.getElementById('theme-icon-dark');
+        const lightIcon = document.getElementById('theme-icon-light');
+        
+        if (theme === 'light') {
+            darkIcon?.classList.add('hidden');
+            lightIcon?.classList.remove('hidden');
+        } else {
+            darkIcon?.classList.remove('hidden');
+            lightIcon?.classList.add('hidden');
+        }
+    }
+    
+    toggleTheme() {
+        const newTheme = this.settings.theme === 'dark' ? 'light' : 'dark';
+        this.setTheme(newTheme);
+    }
+
+    // ==========================================
+    // Settings Modal Methods
+    // ==========================================
+    
+    openSettingsModal() {
+        this.applySettings();
+        this.settingsModal?.classList.remove('hidden');
+    }
+    
+    closeSettingsModal() {
+        this.settingsModal?.classList.add('hidden');
+    }
+
+    // ==========================================
+    // Input Mode Methods (URL/Search)
+    // ==========================================
+    
+    setInputMode(mode) {
+        this.inputMode = mode;
+        
+        // Update toggle buttons
+        document.querySelectorAll('.input-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+        
+        // Update input placeholder and type
+        if (this.urlInput) {
+            if (mode === 'search') {
+                this.urlInput.placeholder = 'Search YouTube videos...';
+                this.urlInput.type = 'text';
+                this.urlInput.inputMode = 'text';
+            } else {
+                this.urlInput.placeholder = 'Paste YouTube URL here...';
+                this.urlInput.type = 'url';
+                this.urlInput.inputMode = 'url';
+            }
+        }
+        
+        // Update metadata button text
+        const metadataBtn = document.getElementById('metadata-btn');
+        if (metadataBtn) {
+            const span = metadataBtn.querySelector('span');
+            if (span) {
+                span.textContent = mode === 'search' ? 'Search' : 'Get Info';
+            }
+        }
+        
+        // Hide search results when switching to URL mode
+        if (mode === 'url') {
+            this.searchResults?.classList.add('hidden');
+        }
+    }
+    
+    async handleSearch() {
+        const query = this.urlInput?.value.trim();
+        if (!query) {
+            this.showToast('Please enter a search term', 'error');
+            return;
+        }
+        
+        this.searchResults?.classList.remove('hidden');
+        this.searchResults.innerHTML = `
+            <div class="search-loading">
+                <div class="loading-spinner"></div>
+                <p>Searching YouTube...</p>
+            </div>
+        `;
+        
+        try {
+            const results = await api.searchYouTube(query);
+            this.displaySearchResults(results);
+        } catch (error) {
+            this.searchResults.innerHTML = `
+                <div class="search-loading">
+                    <p style="color: var(--color-error);">Search failed: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+    
+    displaySearchResults(results) {
+        if (!results || results.length === 0) {
+            this.searchResults.innerHTML = `
+                <div class="search-loading">
+                    <p>No results found</p>
+                </div>
+            `;
+            return;
+        }
+        
+        this.searchResults.innerHTML = results.map(video => `
+            <div class="search-result-item" onclick="app.selectSearchResult('${video.url}')">
+                <img class="search-result-thumb" src="${video.thumbnail || ''}" alt="" 
+                     onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 9%22><rect fill=%22%23333%22 width=%2216%22 height=%229%22/></svg>'">
+                <div class="search-result-info">
+                    <div class="search-result-title">${video.title || 'Unknown'}</div>
+                    <div class="search-result-channel">${video.channel || ''}</div>
+                    <div class="search-result-meta">
+                        ${video.duration_formatted || ''} ${video.view_count_formatted ? '• ' + video.view_count_formatted + ' views' : ''}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    selectSearchResult(url) {
+        this.urlInput.value = url;
+        this.searchResults?.classList.add('hidden');
+        this.setInputMode('url');
+        this.handlePreview();
+    }
+
+    // ==========================================
+    // Progress Overlay Methods
+    // ==========================================
+    
+    showProgressOverlay(title = 'Preparing Download', subtitle = 'Fetching video information...') {
+        if (this.progressTitle) this.progressTitle.textContent = title;
+        if (this.progressSubtitle) this.progressSubtitle.textContent = subtitle;
+        if (this.progressBar) this.progressBar.style.width = '0%';
+        if (this.progressPercent) this.progressPercent.textContent = '0%';
+        if (this.progressSpeed) this.progressSpeed.textContent = '';
+        if (this.progressEta) this.progressEta.textContent = '';
+        
+        const icon = document.getElementById('progress-icon');
+        icon?.classList.remove('success');
+        
+        this.progressOverlay?.classList.remove('hidden');
+    }
+    
+    updateProgress(percent, speed = '', eta = '') {
+        if (this.progressBar) this.progressBar.style.width = `${percent}%`;
+        if (this.progressPercent) this.progressPercent.textContent = `${Math.round(percent)}%`;
+        if (this.progressSpeed) this.progressSpeed.textContent = speed;
+        if (this.progressEta) this.progressEta.textContent = eta ? `ETA: ${eta}` : '';
+        
+        if (percent >= 100) {
+            if (this.progressTitle) this.progressTitle.textContent = 'Processing...';
+            if (this.progressSubtitle) this.progressSubtitle.textContent = 'Finalizing your download...';
+        }
+    }
+    
+    hideProgressOverlay() {
+        this.progressOverlay?.classList.add('hidden');
+    }
+    
+    async cancelCurrentDownload() {
+        if (this.currentDownloadTaskId) {
+            try {
+                await api.cancelDownload(this.currentDownloadTaskId);
+                this.showToast('Download cancelled', 'info');
+            } catch (error) {
+                console.error('Failed to cancel:', error);
+            }
+        }
+        this.hideProgressOverlay();
+        this.currentDownloadTaskId = null;
+    }
+
+    // ==========================================
+    // Complete Modal Methods
+    // ==========================================
+    
+    showCompleteModal(filename, filesize, downloadUrl) {
+        if (this.completeFilename) this.completeFilename.textContent = filename;
+        if (this.completeFilesize) this.completeFilesize.textContent = filesize;
+        if (this.completeDownloadLink) {
+            this.completeDownloadLink.href = downloadUrl;
+            this.completeDownloadLink.download = filename;
+        }
+        
+        // Store for QR sharing
+        this._lastCompletedDownload = { filename, filesize, downloadUrl };
+        
+        this.completeModal?.classList.remove('hidden');
+        
+        // Auto-download if enabled
+        if (this.settings.autoDownload) {
+            this.completeDownloadLink?.click();
+        }
+    }
+    
+    closeCompleteModal() {
+        this.completeModal?.classList.add('hidden');
+    }
+    
+    shareCompletedDownload() {
+        if (this._lastCompletedDownload && this.settings.enableQRSharing) {
+            const absoluteUrl = new URL(this._lastCompletedDownload.downloadUrl, window.location.origin).href;
+            this.showQRCode(absoluteUrl, this._lastCompletedDownload.filename);
+            this.closeCompleteModal();
+        }
+    }
+
+    // ==========================================
+    // Batch Download Methods
+    // ==========================================
+    
+    async startBatchDownload() {
+        if (this.selectedPlaylistItems.size === 0) {
+            this.showToast('Please select at least one video', 'error');
+            return;
+        }
+        
+        this.showProgressOverlay('Batch Download', `Downloading ${this.selectedPlaylistItems.size} videos...`);
+        
+        const selectedIndices = Array.from(this.selectedPlaylistItems);
+        let completed = 0;
+        
+        for (const index of selectedIndices) {
+            const video = this.playlistItems[index];
+            if (!video) continue;
+            
+            try {
+                if (this.progressSubtitle) {
+                    this.progressSubtitle.textContent = `Downloading: ${video.title || 'Video ' + (index + 1)}`;
+                }
+                
+                const downloadRequest = {
+                    url: video.url || video.webpage_url,
+                    format: this.currentFormat === 'audio' ? 'mp3' : 'mp4',
+                    quality: this.currentQuality.replace('p', '').replace('kbps', ''),
+                    audio_only: this.currentFormat === 'audio',
+                };
+                
+                await api.startDownload(downloadRequest);
+                completed++;
+                
+                const progress = (completed / selectedIndices.length) * 100;
+                this.updateProgress(progress);
+                
+            } catch (error) {
+                console.error(`Failed to download video ${index}:`, error);
+            }
+        }
+        
+        this.hideProgressOverlay();
+        this.showToast(`Added ${completed} videos to download queue`, 'success');
+        this.refreshQueue();
     }
 
     // Utility methods

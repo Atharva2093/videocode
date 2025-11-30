@@ -40,14 +40,32 @@
                     <span class="logo-icon">🎬</span>
                     <h1>YT Downloader</h1>
                 </div>
-                <button id="install-btn" class="install-btn hidden" aria-label="Install App">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    <span>Install</span>
-                </button>
+                <div class="header-actions">
+                    <button id="theme-toggle-btn" class="header-btn" onclick="app.toggleTheme()" aria-label="Toggle theme">
+                        <svg id="theme-icon-dark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                        <svg id="theme-icon-light" class="hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="23"/>
+                        </svg>
+                    </button>
+                    <button id="settings-btn" class="header-btn" onclick="app.openSettingsModal()" aria-label="Settings">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </button>
+                    <button id="install-btn" class="install-btn hidden" aria-label="Install App">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Install</span>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -55,6 +73,24 @@
         <main class="main">
             <!-- URL Input Section -->
             <section class="input-section">
+                <!-- Search/URL Toggle -->
+                <div class="input-mode-toggle">
+                    <button class="input-mode-btn active" data-mode="url" onclick="app.setInputMode('url')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                        Paste URL
+                    </button>
+                    <button class="input-mode-btn" data-mode="search" onclick="app.setInputMode('search')">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        Search YouTube
+                    </button>
+                </div>
+
                 <div class="input-wrapper">
                     <input 
                         type="url" 
@@ -80,6 +116,9 @@
                         </svg>
                     </button>
                 </div>
+
+                <!-- Search Results (Hidden by default) -->
+                <div id="search-results" class="search-results hidden"></div>
                 
                 <!-- Action Buttons -->
                 <div class="action-buttons">
@@ -216,6 +255,20 @@
                         </summary>
                         <div id="formats-list" class="formats-list"></div>
                     </details>
+
+                    <!-- Subtitle Selection -->
+                    <div id="subtitle-section" class="subtitle-section hidden">
+                        <label class="quality-label">Subtitles</label>
+                        <div class="subtitle-controls">
+                            <select id="subtitle-select" class="subtitle-select">
+                                <option value="">No subtitles</option>
+                            </select>
+                            <label class="subtitle-merge-label">
+                                <input type="checkbox" id="subtitle-merge">
+                                Embed in video
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -227,11 +280,22 @@
                         <span id="playlist-count" class="playlist-count">0 videos</span>
                     </div>
                     <div class="playlist-actions">
-                        <button id="select-all-btn" class="btn btn-small">Select All</button>
+                        <button id="select-all-btn" class="btn btn-small btn-secondary">Select All</button>
+                        <button id="deselect-all-btn" class="btn btn-small btn-ghost">Unselect All</button>
                         <span id="selected-count" class="selected-count">0 selected</span>
                     </div>
                 </div>
                 <div id="playlist-container" class="playlist-container"></div>
+                <div class="playlist-batch-actions">
+                    <button id="batch-download-btn" class="btn btn-primary btn-large" onclick="app.startBatchDownload()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download Selected
+                    </button>
+                </div>
             </section>
 
             <!-- Download Queue Section -->
@@ -296,6 +360,152 @@
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loading-spinner"></div>
         <p id="loading-text">Loading...</p>
+    </div>
+
+    <!-- Download Progress Overlay -->
+    <div id="progress-overlay" class="progress-overlay hidden">
+        <div class="progress-content">
+            <div class="progress-icon" id="progress-icon">
+                <div class="progress-spinner"></div>
+            </div>
+            <h3 id="progress-title">Preparing Download</h3>
+            <p id="progress-subtitle">Fetching video information...</p>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+                <span class="progress-percent" id="progress-percent">0%</span>
+            </div>
+            <div class="progress-details" id="progress-details">
+                <span id="progress-speed"></span>
+                <span id="progress-eta"></span>
+            </div>
+            <button id="progress-cancel-btn" class="btn btn-ghost btn-small">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Download Complete Modal -->
+    <div id="complete-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="app.closeCompleteModal()"></div>
+        <div class="modal-content complete-modal-content">
+            <div class="modal-header">
+                <h3>✅ Download Complete</h3>
+                <button class="modal-close" onclick="app.closeCompleteModal()" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body complete-modal-body">
+                <div class="complete-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </div>
+                <p class="complete-filename" id="complete-filename">video.mp4</p>
+                <p class="complete-filesize" id="complete-filesize">125.3 MB</p>
+                <div class="complete-actions">
+                    <a id="complete-download-link" href="#" class="btn btn-primary" download>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Save to Device
+                    </a>
+                    <button id="complete-share-btn" class="btn btn-secondary" onclick="app.shareCompletedDownload()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="3" height="3"></rect>
+                        </svg>
+                        Share QR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="app.closeSettingsModal()"></div>
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>⚙️ Settings</h3>
+                <button class="modal-close" onclick="app.closeSettingsModal()" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body settings-modal-body">
+                <div class="settings-group">
+                    <label class="settings-label">Theme</label>
+                    <div class="settings-toggle-group">
+                        <button class="settings-toggle-btn active" data-theme="dark" onclick="app.setTheme('dark')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                            </svg>
+                            Dark
+                        </button>
+                        <button class="settings-toggle-btn" data-theme="light" onclick="app.setTheme('light')">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"/>
+                                <line x1="12" y1="1" x2="12" y2="3"/>
+                                <line x1="12" y1="21" x2="12" y2="23"/>
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                                <line x1="1" y1="12" x2="3" y2="12"/>
+                                <line x1="21" y1="12" x2="23" y2="12"/>
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                            </svg>
+                            Light
+                        </button>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Default Format</label>
+                    <select id="settings-format" class="settings-select" onchange="app.saveSettings()">
+                        <option value="video">Video (MP4)</option>
+                        <option value="audio">Audio (MP3)</option>
+                        <option value="mobile">Mobile Optimized</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Default Quality</label>
+                    <select id="settings-quality" class="settings-select" onchange="app.saveSettings()">
+                        <option value="best">Best Available</option>
+                        <option value="1080p">1080p</option>
+                        <option value="720p">720p</option>
+                        <option value="480p">480p</option>
+                        <option value="360p">360p</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <input type="checkbox" id="settings-mobile-presets" onchange="app.saveSettings()">
+                        Show mobile presets
+                    </label>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <input type="checkbox" id="settings-qr-sharing" checked onchange="app.saveSettings()">
+                        Enable QR code sharing
+                    </label>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <input type="checkbox" id="settings-auto-download" onchange="app.saveSettings()">
+                        Auto-download when ready
+                    </label>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Download Modal -->

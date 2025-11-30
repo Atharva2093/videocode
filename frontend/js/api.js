@@ -234,6 +234,42 @@ class APIClient {
         return { blob, filename, fileSizeMB };
     }
 
+    // ============== Phase 10: YouTube Search ==============
+    /**
+     * GET /search?q= - Search YouTube videos (no API key required)
+     * Uses yt-dlp's ytsearch feature
+     * @param {string} query - Search query
+     * @param {number} limit - Max results (default: 10)
+     * @returns {Array} Search results
+     */
+    async searchYouTube(query, limit = 10) {
+        const encodedQuery = encodeURIComponent(query);
+        return this.request(`/search?q=${encodedQuery}&limit=${limit}`);
+    }
+
+    // ============== Phase 8: Subtitles ==============
+    /**
+     * GET /subtitles - Get available subtitles for a video
+     * @param {string} url - YouTube video URL
+     * @returns {Array} Available subtitle languages
+     */
+    async getSubtitles(url) {
+        const encodedUrl = encodeURIComponent(url);
+        return this.request(`/subtitles?url=${encodedUrl}`);
+    }
+
+    /**
+     * POST /subtitles/download - Download video with subtitles
+     * @param {Object} options - Subtitle download options
+     * @returns {Object} Download response
+     */
+    async downloadWithSubtitles({ url, lang, embed = false, format = 'mp4', quality = 'best' }) {
+        return this.request('/subtitles/download', {
+            method: 'POST',
+            body: JSON.stringify({ url, lang, embed, format, quality }),
+        });
+    }
+
     // ============== Helper Methods ==============
     _extractFilename(headers) {
         const contentDisposition = headers.get('Content-Disposition');
