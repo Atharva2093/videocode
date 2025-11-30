@@ -1,6 +1,6 @@
 /**
  * YouTube Downloader - Main Application
- * Phase 3: Mobile-first responsive UI
+ * Phase 3-5: Mobile-first responsive UI + Mobile Optimization
  */
 
 class App {
@@ -14,6 +14,7 @@ class App {
         // Settings
         this.currentFormat = 'video'; // video, audio, mobile
         this.currentQuality = '1080p';
+        this.currentMobilePreset = 'auto'; // auto, mobile-video, mobile-audio
         this.audioQualities = ['320kbps', '256kbps', '192kbps', '128kbps'];
         this.videoQualities = ['2160p', '1440p', '1080p', '720p', '480p', '360p'];
         this.mobileQualities = ['720p', '480p', '360p'];
@@ -53,6 +54,15 @@ class App {
         this.qualityOptions = document.getElementById('quality-options');
         this.qualityGrid = document.getElementById('quality-grid');
         this.formatsList = document.getElementById('formats-list');
+        
+        // Mobile presets
+        this.mobilePresets = document.getElementById('mobile-presets');
+        this.presetBtns = document.querySelectorAll('.preset-btn');
+
+        // QR Code modal
+        this.qrModal = document.getElementById('qr-modal');
+        this.qrCodeContainer = document.getElementById('qr-code');
+        this.qrUrlInput = document.getElementById('qr-url-input');
 
         // Playlist elements
         this.playlistSection = document.getElementById('playlist-section');
@@ -115,6 +125,11 @@ class App {
         // Format tabs
         this.formatTabs?.forEach(tab => {
             tab.addEventListener('click', () => this.handleFormatTabClick(tab));
+        });
+
+        // Mobile preset buttons
+        document.querySelectorAll('.preset-btn')?.forEach(btn => {
+            btn.addEventListener('click', () => this.handlePresetClick(btn));
         });
 
         // Playlist controls
@@ -219,8 +234,28 @@ class App {
         this.formatTabs.forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
 
-        // Update quality options
-        this.renderQualityOptions();
+        // Show/hide mobile presets vs quality options
+        if (format === 'mobile') {
+            this.mobilePresets?.classList.remove('hidden');
+            this.qualityOptions?.classList.add('hidden');
+        } else {
+            this.mobilePresets?.classList.add('hidden');
+            this.qualityOptions?.classList.remove('hidden');
+            // Update quality options
+            this.renderQualityOptions();
+        }
+    }
+
+    // Mobile preset handling
+    handlePresetClick(btn) {
+        const preset = btn.dataset.preset;
+        this.currentMobilePreset = preset;
+
+        // Update active state
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        this.updateBottomBar();
     }
 
     renderQualityOptions() {
@@ -452,9 +487,9 @@ class App {
             downloadRequest.playlist_items = Array.from(this.selectedPlaylistItems).map(i => i + 1);
         }
 
-        // Mobile compression endpoint
+        // Mobile compression endpoint with presets
         if (mobileOptimized) {
-            return this.handleMobileDownload(url, quality);
+            return this.handleMobileDownload(url);
         }
 
         if (this.downloadBtn) this.downloadBtn.disabled = true;
@@ -474,15 +509,32 @@ class App {
         }
     }
 
-    async handleMobileDownload(url, quality) {
+    async handleMobileDownload(url) {
         try {
             this.showLoading(true, 'Preparing mobile-optimized download...');
             
-            const response = await api.mobileCompression({
-                url,
-                audio_only: false,
-                max_resolution: quality + 'p'
-            });
+            let options = { url };
+            
+            // Apply preset settings
+            switch (this.currentMobilePreset) {
+                case 'mobile-video':
+                    options.max_resolution = '480p';
+                    options.audio_only = false;
+                    break;
+                case 'mobile-audio':
+                    options.audio_only = true;
+                    options.max_resolution = '480p'; // Not used for audio
+                    break;
+                case 'auto':
+                default:
+                    // Auto-detect best settings based on device
+                    const isMobile = window.innerWidth < 768;
+                    options.max_resolution = isMobile ? '480p' : '720p';
+                    options.audio_only = false;
+                    break;
+            }
+            
+            const response = await api.mobileCompression(options);
 
             // Download the file directly
             api.downloadBlob(response.blob, response.filename);
@@ -563,6 +615,17 @@ class App {
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
                             </svg>
                         </a>
+                        <button class="queue-item-btn" onclick="app.showShareOption('${task.task_id}', '${(task.title || 'video').replace(/'/g, "\\'")}')" title="Share QR Code">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="3" height="3"></rect>
+                                <rect x="18" y="14" width="3" height="3"></rect>
+                                <rect x="14" y="18" width="3" height="3"></rect>
+                                <rect x="18" y="18" width="3" height="3"></rect>
+                            </svg>
+                        </button>
                     ` : ''}
                     ${['queued', 'downloading', 'fetching_info'].includes(task.status) ? `
                         <button class="queue-item-btn" onclick="app.cancelTask('${task.task_id}')" title="Cancel">
@@ -720,6 +783,78 @@ class App {
             toast.classList.add('toast-exit');
             setTimeout(() => toast.remove(), 300);
         }, 5000);
+    }
+
+    // ==========================================
+    // QR Code Sharing Methods
+    // ==========================================
+    
+    showQRCode(downloadUrl, filename) {
+        if (!this.qrModal || !this.qrCodeContainer) return;
+
+        // Clear previous QR code
+        this.qrCodeContainer.innerHTML = '';
+        
+        // Set URL input
+        if (this.qrUrlInput) {
+            this.qrUrlInput.value = downloadUrl;
+        }
+
+        // Generate QR code using the library
+        if (typeof QRCode !== 'undefined') {
+            QRCode.toCanvas(downloadUrl, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, (error, canvas) => {
+                if (error) {
+                    console.error('QR Code generation failed:', error);
+                    this.qrCodeContainer.innerHTML = '<p style="color: var(--color-error);">Failed to generate QR code</p>';
+                    return;
+                }
+                this.qrCodeContainer.appendChild(canvas);
+            });
+        } else {
+            // Fallback if library not loaded
+            this.qrCodeContainer.innerHTML = `
+                <p style="color: var(--color-text-secondary); font-size: 0.875rem;">
+                    QR code library not loaded.<br>
+                    Copy the URL below instead.
+                </p>
+            `;
+        }
+
+        // Show modal
+        this.qrModal.classList.remove('hidden');
+    }
+
+    closeQRModal() {
+        this.qrModal?.classList.add('hidden');
+    }
+
+    async copyDownloadURL() {
+        const url = this.qrUrlInput?.value;
+        if (!url) return;
+
+        try {
+            await navigator.clipboard.writeText(url);
+            this.showToast('URL copied to clipboard', 'success');
+        } catch (error) {
+            this.showToast('Failed to copy URL', 'error');
+        }
+    }
+
+    // Call this when a download completes to show QR option
+    showShareOption(taskId, filename) {
+        const downloadUrl = api.getDownloadURL(taskId);
+        
+        // Create absolute URL
+        const absoluteUrl = new URL(downloadUrl, window.location.origin).href;
+        
+        this.showQRCode(absoluteUrl, filename);
     }
 }
 

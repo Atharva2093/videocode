@@ -538,6 +538,63 @@ body {
     color: white;
 }
 
+/* Mobile Presets */
+.mobile-presets {
+    margin-bottom: var(--space-md);
+}
+
+.preset-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.preset-btn {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    background-color: var(--color-surface-hover);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.preset-btn:hover {
+    background-color: var(--color-surface-active);
+    border-color: var(--color-border-light);
+}
+
+.preset-btn.active {
+    background-color: var(--color-primary-light);
+    border-color: var(--color-primary);
+}
+
+.preset-btn svg {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+}
+
+.preset-btn.active svg {
+    color: var(--color-primary);
+}
+
+.preset-name {
+    font-weight: 600;
+    font-size: var(--font-size-md);
+}
+
+.preset-desc {
+    width: 100%;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-left: 28px;
+}
+
 /* Formats Details */
 .formats-details {
     border-top: 1px solid var(--color-border);
@@ -1216,6 +1273,59 @@ body {
 
 .modal-actions .btn {
     width: 100%;
+}
+
+/* QR Code Modal */
+.qr-modal-content {
+    max-width: 340px;
+}
+
+.qr-modal-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.qr-code-container {
+    background: white;
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-code-container canvas {
+    display: block;
+    max-width: 200px;
+    height: auto;
+}
+
+.qr-instructions {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-align: center;
+    max-width: 250px;
+}
+
+.qr-url-container {
+    display: flex;
+    width: 100%;
+    gap: var(--space-sm);
+}
+
+.qr-url-input {
+    flex: 1;
+    padding: var(--space-sm) var(--space-md);
+    background-color: var(--color-surface-hover);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: var(--font-size-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ==========================================

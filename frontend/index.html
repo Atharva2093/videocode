@@ -26,6 +26,9 @@
     
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
     <!-- App Container -->
@@ -157,6 +160,38 @@
                             </svg>
                             Mobile
                         </button>
+                    </div>
+
+                    <!-- Mobile Presets (shown when Mobile tab is active) -->
+                    <div id="mobile-presets" class="mobile-presets hidden">
+                        <label class="quality-label">Mobile Presets</label>
+                        <div class="preset-grid">
+                            <button class="preset-btn active" data-preset="auto">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                                </svg>
+                                <span class="preset-name">Auto Best</span>
+                                <span class="preset-desc">Smart selection for your device</span>
+                            </button>
+                            <button class="preset-btn" data-preset="mobile-video">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                                    <line x1="12" y1="18" x2="12.01" y2="18"/>
+                                </svg>
+                                <span class="preset-name">Mobile Video</span>
+                                <span class="preset-desc">480p MP4 • ~50MB/10min</span>
+                            </button>
+                            <button class="preset-btn" data-preset="mobile-audio">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18V5l12-2v13"/>
+                                    <circle cx="6" cy="18" r="3"/>
+                                    <circle cx="18" cy="16" r="3"/>
+                                </svg>
+                                <span class="preset-name">Small Audio</span>
+                                <span class="preset-desc">64kbps MP3 • ~5MB/10min</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Quality Options -->
@@ -311,6 +346,36 @@
             <line x1="12" y1="20" x2="12.01" y2="20"/>
         </svg>
         <span>You're offline. Some features may be unavailable.</span>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="app.closeQRModal()"></div>
+        <div class="modal-content qr-modal-content">
+            <div class="modal-header">
+                <h3>📱 Transfer to Mobile</h3>
+                <button class="modal-close" onclick="app.closeQRModal()" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body qr-modal-body">
+                <div id="qr-code" class="qr-code-container"></div>
+                <p class="qr-instructions">Scan this QR code with your phone to download the file directly</p>
+                <div class="qr-url-container">
+                    <input id="qr-url-input" type="text" class="qr-url-input" readonly>
+                    <button id="copy-url-btn" class="btn btn-small btn-secondary" onclick="app.copyDownloadURL()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
