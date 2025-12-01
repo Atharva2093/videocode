@@ -107,9 +107,19 @@ def download(url: str, format_id: str = "best"):
             )
         
         filename = os.path.basename(filepath)
+        
+        # Determine media type based on extension
+        ext = os.path.splitext(filename)[1].lower()
+        if ext == ".mp3":
+            media_type = "audio/mpeg"
+        elif ext == ".webm":
+            media_type = "video/webm"
+        else:
+            media_type = "video/mp4"
+        
         return FileResponse(
             filepath,
-            media_type="video/mp4",
+            media_type=media_type,
             filename=filename,
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )

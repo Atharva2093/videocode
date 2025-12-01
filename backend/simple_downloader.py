@@ -25,17 +25,24 @@ def get_ydl_opts():
 
 
 def download_video(url, format_id="best"):
-    outdir = "downloads"
+    outdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
     os.makedirs(outdir, exist_ok=True)
 
-    filename = f"{uuid.uuid4()}.%(ext)s"
-    filepath = os.path.join(outdir, filename)
+    file_id = str(uuid.uuid4())
+    filepath_template = os.path.join(outdir, f"{file_id}.%(ext)s")
 
     ydl_opts = get_ydl_opts()
-    ydl_opts["outtmpl"] = filepath
+    ydl_opts["outtmpl"] = filepath_template
     
-    # Use format_id if provided, otherwise use best available
-    if format_id and format_id != "best":
+    # Handle format selection
+    if format_id == "mp3":
+        ydl_opts["format"] = "bestaudio/best"
+        ydl_opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }]
+    elif format_id and format_id != "best":
         ydl_opts["format"] = f"{format_id}+bestaudio/best"
     else:
         ydl_opts["format"] = "best[ext=mp4]/best"
@@ -43,14 +50,15 @@ def download_video(url, format_id="best"):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         
-        # Check for DRM or live stream issues
+        # Check for live stream issues
         if info.get("is_live"):
             raise Exception("Live streams cannot be downloaded")
-        
-        # Find the downloaded file
-        real_file = os.path.splitext(filepath.replace("%(ext)s", ""))[0]
-        for f in os.listdir(outdir):
-            if f.startswith(real_file.split(os.path.sep)[-1]):
-                return os.path.join(outdir, f)
+    
+    # Find the downloaded file by matching the UUID
+    for f in os.listdir(outdir):
+        if f.startswith(file_id):
+            full_path = os.path.join(outdir, f)
+            if os.path.exists(full_path):
+                return full_path
     
     raise Exception("Download failed - file not found")
