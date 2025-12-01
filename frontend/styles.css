@@ -213,11 +213,44 @@ h1 {
     margin-bottom: 10px;
 }
 
-/* ERROR */
-.error {
-    color: red;
+/* ERROR BOX */
+.error-box {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border: 1px solid #f87171;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 15px;
     text-align: center;
-    margin: 10px 0;
+    animation: shake 0.4s ease;
+}
+[data-theme="dark"] .error-box {
+    background: linear-gradient(135deg, #450a0a, #7f1d1d);
+    border-color: #dc2626;
+}
+.error-message {
+    color: #b91c1c;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+[data-theme="dark"] .error-message {
+    color: #fca5a5;
+}
+.error-hint {
+    color: #991b1b;
+    font-size: 13px;
+    opacity: 0.85;
+}
+[data-theme="dark"] .error-hint {
+    color: #fecaca;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
 }
 
 /* LOADING SPINNER */

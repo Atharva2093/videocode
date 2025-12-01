@@ -1,9 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from simple_downloader import download_video, get_ydl_opts
+from exceptions import (
+    BaseAPIError, InvalidURLError, MetadataError, DownloadError,
+    DRMError, LiveStreamError, classify_ytdlp_error
+)
 import yt_dlp
 import os
+import re
 
 app = FastAPI()
 
@@ -16,10 +21,41 @@ app.add_middleware(
 )
 
 
-def is_drm_error(error_str: str) -> bool:
-    """Check if the error is related to DRM or extraction issues"""
-    drm_keywords = ["DRM", "drm", "protected", "nsig", "signature", "SABR", "unplayable"]
-    return any(keyword in error_str for keyword in drm_keywords)
+# ========== GLOBAL EXCEPTION HANDLER ==========
+@app.exception_handler(BaseAPIError)
+async def api_error_handler(request: Request, exc: BaseAPIError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.error,
+            "message": exc.message,
+            "hint": exc.hint
+        }
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_error_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "INTERNAL_ERROR",
+            "message": "An unexpected error occurred.",
+            "hint": "Please try again later."
+        }
+    )
+
+
+# ========== URL VALIDATION ==========
+def validate_youtube_url(url: str) -> bool:
+    """Check if URL is a valid YouTube link"""
+    patterns = [
+        r'(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'(https?://)?(www\.)?youtu\.be/[\w-]+',
+        r'(https?://)?(www\.)?youtube\.com/shorts/[\w-]+',
+        r'(https?://)?(www\.)?youtube\.com/embed/[\w-]+',
+    ]
+    return any(re.match(pattern, url) for pattern in patterns)
 
 
 @app.get("/api/health")
@@ -29,6 +65,10 @@ def health():
 
 @app.get("/api/metadata")
 def metadata(url: str):
+    # Validate URL first
+    if not url or not validate_youtube_url(url):
+        raise InvalidURLError()
+    
     ydl_opts = get_ydl_opts()
     ydl_opts["skip_download"] = True
     
@@ -36,12 +76,12 @@ def metadata(url: str):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             
+            if not info:
+                raise MetadataError()
+            
             # Check for live streams
             if info.get("is_live"):
-                return JSONResponse(
-                    status_code=400,
-                    content={"error": "Live streams cannot be downloaded"}
-                )
+                raise LiveStreamError()
             
             # Filter formats that have valid URLs and are not DRM protected
             valid_formats = []
@@ -62,7 +102,12 @@ def metadata(url: str):
                     "filesize": f.get("filesize"),
                 })
             
-            # If no formats found, still return basic info (download will use fallback)
+            # Check if all formats are DRM protected
+            if not valid_formats and info.get("formats"):
+                has_drm = any(f.get("has_drm") for f in info.get("formats", []))
+                if has_drm:
+                    raise DRMError()
+            
             return {
                 "title": info.get("title"),
                 "thumbnail": info.get("thumbnail"),
@@ -70,41 +115,28 @@ def metadata(url: str):
                 "formats": valid_formats if valid_formats else [{"id": "best", "ext": "mp4", "quality": "best"}],
             }
             
+    except BaseAPIError:
+        # Re-raise our custom exceptions
+        raise
     except Exception as e:
         error_str = str(e)
         
-        # Check for DRM/extraction errors
-        if is_drm_error(error_str):
-            return JSONResponse(
-                status_code=400,
-                content={"error": "This video cannot be downloaded due to DRM or YouTube restrictions."}
-            )
-        
-        # Try fallback extraction with extract_flat
-        try:
-            ydl_opts["extract_flat"] = True
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                return {
-                    "title": info.get("title", "Unknown"),
-                    "thumbnail": info.get("thumbnail"),
-                    "formats": [{"id": "best", "ext": "mp4", "quality": "best"}],
-                }
-        except:
-            return JSONResponse(
-                status_code=400,
-                content={"error": f"Failed to extract video info: {error_str}"}
-            )
+        # Classify the yt-dlp error and raise appropriate exception
+        raise classify_ytdlp_error(error_str)
 
 
 @app.get("/api/download")
 def download(url: str, format_id: str = "best"):
+    # Validate URL first
+    if not url or not validate_youtube_url(url):
+        raise InvalidURLError()
+    
     try:
         filepath = download_video(url, format_id)
         if not filepath or not os.path.exists(filepath):
-            return JSONResponse(
-                status_code=500,
-                content={"error": "Download failed - file not created"}
+            raise DownloadError(
+                message="Download completed but file was not created.",
+                hint="Try again or select a different quality."
             )
         
         filename = os.path.basename(filepath)
@@ -124,16 +156,11 @@ def download(url: str, format_id: str = "best"):
             filename=filename,
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
+    except BaseAPIError:
+        # Re-raise our custom exceptions
+        raise
     except Exception as e:
         error_str = str(e)
         
-        if is_drm_error(error_str):
-            return JSONResponse(
-                status_code=400,
-                content={"error": "This video cannot be downloaded due to DRM or YouTube restrictions."}
-            )
-        
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Download failed: {error_str}"}
-        )
+        # Classify the yt-dlp error and raise appropriate exception
+        raise classify_ytdlp_error(error_str)

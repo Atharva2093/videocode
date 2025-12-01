@@ -9,12 +9,36 @@ let availableQualities = [];
 const urlInput = document.getElementById("url");
 const infoDiv = document.getElementById("info");
 const loading = document.getElementById("loading");
-const errorDiv = document.getElementById("error");
 const historyDiv = document.getElementById("history");
 const progressContainer = document.getElementById("progressContainer");
 const progressBar = document.getElementById("progressBar");
 const qualitySelector = document.getElementById("qualitySelector");
 const downloadBtn = document.getElementById("downloadBtn");
+const errorBox = document.getElementById("errorBox");
+const errorMessage = document.getElementById("errorMessage");
+const errorHint = document.getElementById("errorHint");
+
+/* ---------- ERROR HANDLING ---------- */
+function showError(message, hint = "") {
+    errorMessage.textContent = message;
+    errorHint.textContent = hint;
+    errorBox.classList.remove("hidden");
+}
+
+function hideError() {
+    errorBox.classList.add("hidden");
+    errorMessage.textContent = "";
+    errorHint.textContent = "";
+}
+
+/* ---------- CLEAR ERRORS ON INPUT ---------- */
+urlInput.addEventListener("input", hideError);
+urlInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+        hideError();
+        getInfo();
+    }
+});
 
 /* ---------- DARK MODE ---------- */
 function toggleTheme() {
@@ -103,13 +127,19 @@ function renderQualityChips(formats) {
 /* ---------- FETCH METADATA ---------- */
 async function getInfo() {
     const url = urlInput.value.trim();
-    errorDiv.textContent = "";
+    hideError();
     infoDiv.innerHTML = "";
     qualitySelector.classList.add("hidden");
     downloadBtn.classList.add("hidden");
 
     if (!url) {
-        errorDiv.textContent = "Please paste a YouTube URL.";
+        showError("Please enter a YouTube URL.", "Example: https://youtu.be/xxxx");
+        return;
+    }
+
+    // Basic URL validation
+    if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
+        showError("Invalid URL format.", "Please enter a valid YouTube link.");
         return;
     }
 
@@ -121,8 +151,9 @@ async function getInfo() {
 
         loading.classList.add("hidden");
 
-        if (data.detail || data.error) {
-            errorDiv.textContent = data.error || "Invalid video or DRM protected.";
+        // Handle standardized error response
+        if (data.error) {
+            showError(data.message || data.error, data.hint || "");
             return;
         }
 
@@ -149,7 +180,7 @@ async function getInfo() {
 
     } catch (error) {
         loading.classList.add("hidden");
-        errorDiv.textContent = "Error fetching video.";
+        showError("Could not connect to server.", "Check your internet connection and try again.");
     }
 }
 
@@ -161,6 +192,7 @@ function startDownload() {
 
 /* ---------- DOWNLOAD WITH PROGRESS ---------- */
 async function download(url, format) {
+    hideError();
     progressContainer.classList.remove("hidden");
     progressBar.style.width = "0%";
     progressBar.classList.add("animated");
@@ -179,7 +211,22 @@ async function download(url, format) {
 
         // If folder selected → save to that folder
         if (selectedFolder) {
-            await saveToSelectedFolder(downloadUrl);
+            const response = await fetch(downloadUrl);
+            
+            // Check for error response (JSON)
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                const data = await response.json();
+                if (data.error) {
+                    clearInterval(interval);
+                    progressBar.classList.remove("animated");
+                    progressContainer.classList.add("hidden");
+                    showError(data.message || data.error, data.hint || "");
+                    return;
+                }
+            }
+            
+            await saveToSelectedFolder(downloadUrl, response);
             clearInterval(interval);
             progressBar.style.width = "100%";
             
@@ -206,14 +253,14 @@ async function download(url, format) {
         clearInterval(interval);
         progressBar.classList.remove("animated");
         progressContainer.classList.add("hidden");
-        errorDiv.textContent = "Error downloading video.";
+        showError("Download failed.", "Check your connection and try again.");
     }
 }
 
 /* ---------- SAVE FILE TO SELECTED FOLDER ---------- */
-async function saveToSelectedFolder(fileURL) {
+async function saveToSelectedFolder(fileURL, existingResponse = null) {
     try {
-        const response = await fetch(fileURL);
+        const response = existingResponse || await fetch(fileURL);
         const blob = await response.blob();
 
         // Extract filename from Content-Disposition or URL
