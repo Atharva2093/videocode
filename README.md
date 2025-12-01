@@ -73,6 +73,36 @@ A full-stack YouTube video and playlist downloader with a modern PWA web interfa
 
 ---
 
+## 🎯 How It Works
+
+A simple 3-step workflow designed for speed and clarity:
+
+### Step 1: Enter URL
+- Paste a YouTube video URL into the input field
+- Use the 📋 button to paste from clipboard
+- Invalid URLs are caught immediately with helpful error messages
+- Tracking parameters (si=, feature=, etc.) are auto-removed
+
+### Step 2: Preview Video
+- See the video thumbnail, title, channel, and duration
+- Confirm you have the right video before proceeding
+- Backend fetches metadata and available formats
+
+### Step 3: Choose Quality & Download
+- Select MP4 (video) or MP3 (audio) format
+- Pick from available quality options shown as chips
+- Click a quality chip to start download
+- Watch real-time progress with percentage
+- File saves to your Downloads folder (or custom folder if supported)
+
+### Additional Features
+- **🌙 Theme Toggle** - Switch between light and dark modes
+- **📁 Folder Picker** - Choose download destination (Chrome/Edge)
+- **📜 Recent Downloads** - Quick access to previous downloads
+- **🔌 Connection Status** - Live backend health indicator in footer
+
+---
+
 ## 📚 Documentation
 
 - [📐 Architecture](docs/ARCHITECTURE.md) - System design and component diagram
