@@ -1,35 +1,419 @@
-const API =
-    location.hostname.includes("localhost") || location.hostname.includes("127.")
-        ? "http://127.0.0.1:8000/api"
-        : "https://yt-downloader-backend-ogpx.onrender.com/api";
+/* ========================================
+   YOUTUBE DOWNLOADER - FRONTEND SCRIPT
+   Clean, modular, step-by-step workflow
+======================================== */
 
-/* -------------------------------------------
-   GLOBAL VARIABLES
--------------------------------------------- */
-let selectedFolder = null;
+// ========================================
+// CONFIGURATION
+// ========================================
+const API = location.hostname.includes("localhost") || location.hostname.includes("127.")
+    ? "http://127.0.0.1:8000/api"
+    : "https://yt-downloader-backend-ogpx.onrender.com/api";
+
+// ========================================
+// STATE
+// ========================================
 let selectedFormat = "mp4";
-let selectedQuality = "720p";
+let selectedQuality = null;
+let currentVideoData = null;
 let currentVideoUrl = "";
+let selectedFolder = null;
 let availableQualities = [];
 
-/* -------------------------------------------
-   DOM ELEMENTS
--------------------------------------------- */
-const urlInput = document.getElementById("url");
-const infoDiv = document.getElementById("info");
-const loading = document.getElementById("loading");
-const historyDiv = document.getElementById("history");
-const progressContainer = document.getElementById("progressContainer");
-const progressBar = document.getElementById("progressBar");
-const qualitySelector = document.getElementById("qualitySelector");
-const downloadBtn = document.getElementById("downloadBtn");
+// ========================================
+// DOM ELEMENTS
+// ========================================
+const urlInput = document.getElementById("urlInput");
+const fetchBtn = document.getElementById("fetchBtn");
+const loader = document.getElementById("loader");
 const errorBox = document.getElementById("errorBox");
 const errorMessage = document.getElementById("errorMessage");
 const errorHint = document.getElementById("errorHint");
+const videoPreview = document.getElementById("videoPreview");
+const thumbnail = document.getElementById("thumbnail");
+const videoTitle = document.getElementById("videoTitle");
+const videoChannel = document.getElementById("videoChannel");
+const videoDuration = document.getElementById("videoDuration");
+const qualitySection = document.getElementById("qualitySection");
+const qualityChips = document.getElementById("qualityChips");
+const downloadSection = document.getElementById("downloadSection");
+const folderBtn = document.getElementById("folderBtn");
+const folderStatus = document.getElementById("folderStatus");
+const downloadBtn = document.getElementById("downloadBtn");
+const progressSection = document.getElementById("progressSection");
+const progressFill = document.getElementById("progressFill");
+const progressText = document.getElementById("progressText");
+const successBox = document.getElementById("successBox");
+const recentList = document.getElementById("recentList");
+const connectionStatus = document.getElementById("connectionStatus");
 
-/* -------------------------------------------
-   ERROR HANDLING
--------------------------------------------- */
+// ========================================
+// INITIALIZATION
+// ========================================
+document.addEventListener("DOMContentLoaded", () => {
+    checkConnection();
+    renderRecentDownloads();
+    setupEventListeners();
+    checkFolderPickerSupport();
+});
+
+function setupEventListeners() {
+    // Clear errors on input
+    urlInput.addEventListener("input", () => {
+        hideError();
+        hideSuccess();
+    });
+    
+    // Enter key to fetch
+    urlInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") fetchVideo();
+    });
+}
+
+function checkFolderPickerSupport() {
+    if (window.showDirectoryPicker) {
+        folderBtn.classList.remove("hidden");
+    }
+}
+
+// ========================================
+// THEME TOGGLE
+// ========================================
+function toggleTheme() {
+    const html = document.documentElement;
+    const newTheme = html.dataset.theme === "dark" ? "light" : "dark";
+    html.dataset.theme = newTheme;
+    
+    const icon = document.querySelector(".theme-icon");
+    icon.textContent = newTheme === "dark" ? "☀️" : "🌙";
+    
+    localStorage.setItem("theme", newTheme);
+}
+
+// Load saved theme
+(function() {
+    const saved = localStorage.getItem("theme");
+    if (saved) {
+        document.documentElement.dataset.theme = saved;
+        const icon = document.querySelector(".theme-icon");
+        if (icon) icon.textContent = saved === "dark" ? "☀️" : "🌙";
+    }
+})();
+
+// ========================================
+// CLIPBOARD
+// ========================================
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (text && isYouTubeUrl(text)) {
+            urlInput.value = cleanUrl(text);
+            hideError();
+        } else if (text) {
+            urlInput.value = text;
+        }
+    } catch (err) {
+        // Clipboard access denied - silent fail
+    }
+}
+
+// ========================================
+// URL VALIDATION & CLEANING
+// ========================================
+function isYouTubeUrl(url) {
+    return /(?:youtube\.com|youtu\.be)/.test(url);
+}
+
+function cleanUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        // Remove tracking parameters
+        const paramsToRemove = ["si", "feature", "t", "start", "list", "index"];
+        paramsToRemove.forEach(p => urlObj.searchParams.delete(p));
+        return urlObj.toString();
+    } catch {
+        return url;
+    }
+}
+
+function validateUrl(url) {
+    if (!url) {
+        return { valid: false, message: "Please enter a URL", hint: "" };
+    }
+    
+    if (!isYouTubeUrl(url)) {
+        return { 
+            valid: false, 
+            message: "Invalid YouTube URL", 
+            hint: "Example: https://youtube.com/watch?v=..." 
+        };
+    }
+    
+    return { valid: true };
+}
+
+// ========================================
+// FORMAT SELECTION
+// ========================================
+function setFormat(format) {
+    selectedFormat = format;
+    
+    document.getElementById("btnMp4").classList.toggle("active", format === "mp4");
+    document.getElementById("btnMp3").classList.toggle("active", format === "mp3");
+    
+    // Show/hide quality section based on format
+    if (currentVideoData) {
+        if (format === "mp4" && availableQualities.length > 0) {
+            qualitySection.classList.remove("hidden");
+        } else {
+            qualitySection.classList.add("hidden");
+        }
+    }
+}
+
+// ========================================
+// QUALITY SELECTION
+// ========================================
+function setQuality(quality) {
+    selectedQuality = quality;
+    
+    document.querySelectorAll(".quality-chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.quality === quality);
+    });
+}
+
+function renderQualityChips(formats) {
+    const qualitySet = new Set();
+    
+    formats.forEach(f => {
+        if (f.height) {
+            qualitySet.add(f.height);
+        }
+    });
+    
+    availableQualities = Array.from(qualitySet).sort((a, b) => b - a);
+    
+    if (availableQualities.length === 0) {
+        qualitySection.classList.add("hidden");
+        return;
+    }
+    
+    // Default to 720p or highest available
+    selectedQuality = availableQualities.includes(720) ? 720 : availableQualities[0];
+    
+    qualityChips.innerHTML = availableQualities.map(q => `
+        <button 
+            class="quality-chip ${q === selectedQuality ? 'active' : ''}" 
+            data-quality="${q}"
+            onclick="setQuality(${q})"
+        >
+            ${q}p
+        </button>
+    `).join("");
+}
+
+// ========================================
+// FETCH VIDEO INFO
+// ========================================
+async function fetchVideo() {
+    const url = urlInput.value.trim();
+    
+    // Validate
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+        showError(validation.message, validation.hint);
+        return;
+    }
+    
+    // Clean URL
+    const cleanedUrl = cleanUrl(url);
+    urlInput.value = cleanedUrl;
+    currentVideoUrl = cleanedUrl;
+    
+    // Reset UI
+    resetUI();
+    showLoader();
+    
+    try {
+        const res = await fetch(`${API}/metadata?url=${encodeURIComponent(cleanedUrl)}`);
+        const data = await res.json();
+        
+        hideLoader();
+        
+        if (data.error) {
+            showError(data.message || data.error, data.hint || "");
+            return;
+        }
+        
+        currentVideoData = data;
+        displayVideoInfo(data);
+        
+    } catch (err) {
+        hideLoader();
+        showError("Connection failed", "Check your internet or try again later");
+    }
+}
+
+function displayVideoInfo(data) {
+    // Set thumbnail
+    thumbnail.src = data.thumbnail || "";
+    
+    // Set title
+    videoTitle.textContent = data.title || "Unknown Title";
+    
+    // Set channel (if available)
+    videoChannel.textContent = data.channel || data.uploader || "";
+    
+    // Set duration
+    if (data.duration) {
+        const mins = Math.floor(data.duration / 60);
+        const secs = data.duration % 60;
+        videoDuration.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    } else {
+        videoDuration.textContent = "";
+    }
+    
+    // Show video preview
+    videoPreview.classList.remove("hidden");
+    
+    // Render quality chips for MP4
+    if (data.formats && data.formats.length > 0) {
+        renderQualityChips(data.formats);
+        if (selectedFormat === "mp4") {
+            qualitySection.classList.remove("hidden");
+        }
+    }
+    
+    // Show download section
+    downloadSection.classList.remove("hidden");
+}
+
+// ========================================
+// FOLDER PICKER
+// ========================================
+async function selectFolder() {
+    if (!window.showDirectoryPicker) {
+        return;
+    }
+    
+    try {
+        selectedFolder = await window.showDirectoryPicker();
+        folderStatus.textContent = "📁 Folder selected";
+        folderStatus.classList.remove("hidden");
+    } catch (err) {
+        // User cancelled - silent
+    }
+}
+
+// ========================================
+// DOWNLOAD
+// ========================================
+async function startDownload() {
+    if (!currentVideoUrl) return;
+    
+    hideError();
+    hideSuccess();
+    showProgress();
+    
+    const formatId = selectedFormat === "mp3" 
+        ? "mp3" 
+        : `best[height<=${selectedQuality || 720}]`;
+    
+    const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
+    
+    // Simulate progress
+    let progress = 0;
+    const interval = setInterval(() => {
+        if (progress < 90) {
+            progress += Math.random() * 15;
+            updateProgress(Math.min(progress, 90));
+        }
+    }, 300);
+    
+    try {
+        if (selectedFolder) {
+            // Download to selected folder
+            const response = await fetch(downloadUrl);
+            
+            // Check for error response
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                const data = await response.json();
+                clearInterval(interval);
+                hideProgress();
+                showError(data.message || data.error, data.hint || "");
+                return;
+            }
+            
+            const blob = await response.blob();
+            const fileName = getFileName(response, currentVideoData?.title);
+            
+            const fileHandle = await selectedFolder.getFileHandle(fileName, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            
+            clearInterval(interval);
+            updateProgress(100);
+            
+            setTimeout(() => {
+                hideProgress();
+                showSuccess();
+                saveToHistory(currentVideoData?.title || currentVideoUrl);
+            }, 500);
+            
+        } else {
+            // Browser download
+            clearInterval(interval);
+            updateProgress(100);
+            
+            setTimeout(() => {
+                hideProgress();
+                showSuccess();
+                saveToHistory(currentVideoData?.title || currentVideoUrl);
+                window.location.href = downloadUrl;
+            }, 500);
+        }
+        
+    } catch (err) {
+        clearInterval(interval);
+        hideProgress();
+        showError("Download failed", "Please try again");
+    }
+}
+
+function getFileName(response, title) {
+    const contentDisposition = response.headers.get("content-disposition");
+    if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (match) return match[1];
+    }
+    
+    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
+    const safeName = (title || "video").replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50);
+    return safeName + ext;
+}
+
+// ========================================
+// PROGRESS
+// ========================================
+function showProgress() {
+    progressSection.classList.remove("hidden");
+    updateProgress(0);
+}
+
+function hideProgress() {
+    progressSection.classList.add("hidden");
+}
+
+function updateProgress(percent) {
+    progressFill.style.width = percent + "%";
+    progressText.textContent = Math.round(percent) + "%";
+}
+
+// ========================================
+// ERROR HANDLING
+// ========================================
 function showError(message, hint = "") {
     errorMessage.textContent = message;
     errorHint.textContent = hint;
@@ -38,268 +422,107 @@ function showError(message, hint = "") {
 
 function hideError() {
     errorBox.classList.add("hidden");
-    errorMessage.textContent = "";
-    errorHint.textContent = "";
 }
 
-urlInput.addEventListener("input", hideError);
-urlInput.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") {
-        hideError();
-        getInfo();
-    }
-});
-
-/* -------------------------------------------
-   DARK MODE
--------------------------------------------- */
-function toggleTheme() {
-    const html = document.documentElement;
-    html.dataset.theme = html.dataset.theme === "dark" ? "light" : "dark";
+// ========================================
+// SUCCESS MESSAGE
+// ========================================
+function showSuccess() {
+    successBox.classList.remove("hidden");
 }
 
-/* -------------------------------------------
-   CLIPBOARD AUTO-DETECT (Mobile + Desktop)
--------------------------------------------- */
-document.addEventListener("click", async () => {
-    try {
-        const text = await navigator.clipboard.readText();
-        if (text.includes("youtube.com") || text.includes("youtu.be")) {
-            urlInput.value = text;
-        }
-    } catch (err) {
-        // Clipboard access denied - silent fail
-    }
-});
-
-/* -------------------------------------------
-   SELECT FOLDER
--------------------------------------------- */
-async function selectFolder() {
-    if (!window.showDirectoryPicker) {
-        alert("Folder selection is only supported in Chrome / Edge.");
-        return;
-    }
-
-    try {
-        selectedFolder = await window.showDirectoryPicker();
-        document.getElementById("folderPath").textContent = "Folder selected ✔";
-        alert("Folder selected!");
-    } catch (err) {
-        alert("Folder selection cancelled.");
-    }
+function hideSuccess() {
+    successBox.classList.add("hidden");
 }
 
-/* -------------------------------------------
-   FORMAT (MP4 / MP3)
--------------------------------------------- */
-function setFormat(format) {
-    selectedFormat = format;
-
-    document.getElementById("btnMp4").classList.toggle("active", format === "mp4");
-    document.getElementById("btnMp3").classList.toggle("active", format === "mp3");
-
-    if (format === "mp4" && availableQualities.length > 0) {
-        qualitySelector.classList.remove("hidden");
-    } else {
-        qualitySelector.classList.add("hidden");
-    }
+// ========================================
+// LOADER
+// ========================================
+function showLoader() {
+    loader.classList.remove("hidden");
+    fetchBtn.disabled = true;
 }
 
-/* -------------------------------------------
-   QUALITY SELECTOR
--------------------------------------------- */
-function setQuality(quality) {
-    selectedQuality = quality;
-    document.querySelectorAll(".quality-chip").forEach((chip) => {
-        chip.classList.toggle("active", chip.dataset.quality === quality);
-    });
+function hideLoader() {
+    loader.classList.add("hidden");
+    fetchBtn.disabled = false;
 }
 
-/* -------------------------------------------
-   RENDER QUALITY BUTTONS
--------------------------------------------- */
-function renderQualityChips(formats) {
-    const qualitySet = new Set();
-
-    formats.forEach((f) => {
-        if (f.height) qualitySet.add(f.height + "p");
-    });
-
-    availableQualities = Array.from(qualitySet).sort(
-        (a, b) => parseInt(b) - parseInt(a)
-    );
-
-    selectedQuality = availableQualities.includes("720p")
-        ? "720p"
-        : availableQualities[0] || "360p";
-
-    qualitySelector.innerHTML = availableQualities
-        .map(
-            (q) =>
-                `<button class="quality-chip ${q === selectedQuality ? "active" : ""}" data-quality="${q}" onclick="setQuality('${q}')">${q}</button>`
-        )
-        .join("");
-}
-
-/* -------------------------------------------
-   FETCH VIDEO INFO
--------------------------------------------- */
-async function getInfo() {
-    const url = urlInput.value.trim();
+// ========================================
+// RESET UI
+// ========================================
+function resetUI() {
     hideError();
-    infoDiv.innerHTML = "";
-    qualitySelector.classList.add("hidden");
-    downloadBtn.classList.add("hidden");
+    hideSuccess();
+    hideProgress();
+    videoPreview.classList.add("hidden");
+    qualitySection.classList.add("hidden");
+    downloadSection.classList.add("hidden");
+    currentVideoData = null;
+    availableQualities = [];
+}
 
-    if (!url) {
-        showError("Please enter a YouTube URL.", "Example: https://youtu.be/xxxx");
+// ========================================
+// RECENT DOWNLOADS (localStorage)
+// ========================================
+function saveToHistory(title) {
+    const history = JSON.parse(localStorage.getItem("downloadHistory") || "[]");
+    
+    history.unshift({
+        title: title.substring(0, 60),
+        time: new Date().toLocaleString()
+    });
+    
+    // Keep only last 5
+    if (history.length > 5) history.pop();
+    
+    localStorage.setItem("downloadHistory", JSON.stringify(history));
+    renderRecentDownloads();
+}
+
+function renderRecentDownloads() {
+    const history = JSON.parse(localStorage.getItem("downloadHistory") || "[]");
+    
+    if (history.length === 0) {
+        recentList.innerHTML = '<p class="empty-text">No downloads yet</p>';
         return;
     }
+    
+    recentList.innerHTML = history.map(item => `
+        <div class="recent-item">
+            <span class="recent-item-title">${escapeHtml(item.title)}</span>
+            <span class="recent-item-time">${item.time}</span>
+        </div>
+    `).join("");
+}
 
-    loading.classList.remove("hidden");
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
 
+// ========================================
+// CONNECTION STATUS
+// ========================================
+async function checkConnection() {
     try {
-        const res = await fetch(`${API}/metadata?url=${encodeURIComponent(url)}`);
+        const res = await fetch(`${API}/health`);
         const data = await res.json();
-
-        loading.classList.add("hidden");
-
-        if (data.error) {
-            showError(data.message || data.error, data.hint);
-            return;
-        }
-
-        currentVideoUrl = url;
-
-        infoDiv.innerHTML = `
-            <div class="video-card">
-                <img src="${data.thumbnail}">
-                <p class="video-title">${data.title}</p>
-            </div>
-        `;
-
-        if (data.formats) {
-            renderQualityChips(data.formats);
-            if (selectedFormat === "mp4") {
-                qualitySelector.classList.remove("hidden");
-            }
-        }
-
-        downloadBtn.classList.remove("hidden");
-    } catch (err) {
-        loading.classList.add("hidden");
-        showError("Could not connect to server.", "Check your internet connection.");
-    }
-}
-
-/* -------------------------------------------
-   START DOWNLOAD
--------------------------------------------- */
-function startDownload() {
-    const formatId =
-        selectedFormat === "mp3"
-            ? "mp3"
-            : `best[height<=${parseInt(selectedQuality)}]`;
-
-    download(currentVideoUrl, formatId);
-}
-
-/* -------------------------------------------
-   DOWNLOAD VIDEO
--------------------------------------------- */
-async function download(url, format) {
-    hideError();
-    progressContainer.classList.remove("hidden");
-    progressBar.style.width = "0%";
-
-    let fakeProgress = 0;
-    const interval = setInterval(() => {
-        fakeProgress = Math.min(fakeProgress + Math.random() * 10, 90);
-        progressBar.style.width = fakeProgress + "%";
-    }, 300);
-
-    try {
-        const downloadUrl = `${API}/download?url=${encodeURIComponent(
-            url
-        )}&format_id=${format}`;
-
-        if (selectedFolder) {
-            const response = await fetch(downloadUrl);
-            const type = response.headers.get("content-type");
-
-            if (type?.includes("json")) {
-                const err = await response.json();
-                clearInterval(interval);
-                showError(err.message, err.hint);
-                return;
-            }
-
-            await saveToSelectedFolder(downloadUrl, response);
-        } else {
-            window.location.href = downloadUrl;
-        }
-
-        clearInterval(interval);
-        progressBar.style.width = "100%";
-
-        saveToHistory(document.querySelector(".video-title")?.textContent || url);
-
-        setTimeout(() => {
-            progressContainer.classList.add("hidden");
-        }, 1500);
-    } catch (err) {
-        clearInterval(interval);
-        showError("Download failed.", "Please try again.");
-    }
-}
-
-/* -------------------------------------------
-   SAVE FILE IN CHOSEN FOLDER
--------------------------------------------- */
-async function saveToSelectedFolder(url, response) {
-    const blob = await response.blob();
-    const fileName = "video.mp4";
-
-    const handle = await selectedFolder.getFileHandle(fileName, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(blob);
-    await writable.close();
-}
-
-/* -------------------------------------------
-   DOWNLOAD HISTORY
--------------------------------------------- */
-function saveToHistory(name) {
-    let h = JSON.parse(localStorage.getItem("history") || "[]");
-    h.unshift({ name, time: new Date().toLocaleString() });
-    if (h.length > 5) h.pop();
-    localStorage.setItem("history", JSON.stringify(h));
-    renderHistory();
-}
-
-function renderHistory() {
-    let h = JSON.parse(localStorage.getItem("history") || "[]");
-    historyDiv.innerHTML = h
-        .map(
-            (x) =>
-                `<div class="history-item">${x.name}<br><small>${x.time}</small></div>`
-        )
-        .join("");
-}
-
-renderHistory();
-
-/* -------------------------------------------
-   HEALTH CHECK ON LOAD
--------------------------------------------- */
-fetch(`${API}/health`)
-    .then((res) => res.json())
-    .then((data) => {
+        
         if (data.status === "ok") {
-            console.log("✅ Backend connected:", API);
+            connectionStatus.textContent = "● Connected";
+            connectionStatus.classList.remove("offline");
+            connectionStatus.classList.add("online");
+        } else {
+            throw new Error("Not ok");
         }
-    })
-    .catch(() => {
-        console.warn("⚠️ Backend unavailable:", API);
-    });
+    } catch {
+        connectionStatus.textContent = "● Offline";
+        connectionStatus.classList.remove("online");
+        connectionStatus.classList.add("offline");
+    }
+}
+
+// Check connection every 30 seconds
+setInterval(checkConnection, 30000);
