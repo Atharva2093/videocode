@@ -2,10 +2,21 @@ import yt_dlp
 import os
 import uuid
 
+# Path to cookies file
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
 
-# Optimized yt-dlp options - use default client (ANDROID works best without JS runtime)
+# Check for Render secrets path
+RENDER_COOKIES = "/etc/secrets/cookies.txt"
+if os.path.exists(RENDER_COOKIES):
+    COOKIES_FILE = RENDER_COOKIES
+
+
 def get_ydl_opts():
-    return {
+    """
+    Optimized yt-dlp options with cookie support to bypass bot detection.
+    """
+    opts = {
         "quiet": True,
         "no_warnings": True,
         "format": "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
@@ -15,13 +26,19 @@ def get_ydl_opts():
         "no_color": True,
         "retries": 3,
         "fragment_retries": 3,
-        # Use default extractor (ANDROID client) - works without JS runtime
+        # Use iOS client - most reliable for bypassing restrictions
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
+                "player_client": ["ios", "android", "web"],
             }
         },
     }
+    
+    # Add cookies if file exists
+    if os.path.exists(COOKIES_FILE):
+        opts["cookiefile"] = COOKIES_FILE
+    
+    return opts
 
 
 def download_video(url, format_id="best"):

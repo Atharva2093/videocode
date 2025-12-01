@@ -104,6 +104,65 @@ A full-stack YouTube video and playlist downloader with a modern PWA web interfa
 - FFmpeg (for audio extraction)
 - Git
 
+---
+
+## 🔐 Authentication (Required)
+
+YouTube now requires authentication to prevent bot detection. You **must** export cookies from your browser.
+
+### Why is this needed?
+
+YouTube shows "Sign in to confirm you're not a bot" errors when downloading videos without authentication. By using cookies from a logged-in browser session, yt-dlp can bypass this restriction.
+
+### Export Cookies
+
+**Option 1: Use the built-in utility (Recommended)**
+
+```bash
+cd backend/tools
+python export_cookies.py chrome    # or edge, firefox, brave
+```
+
+**Option 2: Manual export with yt-dlp**
+
+```bash
+yt-dlp --cookies-from-browser chrome --cookies backend/cookies.txt https://www.youtube.com
+```
+
+### Steps:
+
+1. **Log into YouTube** in your browser (Chrome, Edge, Firefox, or Brave)
+2. **Close the browser** (required for cookie access)
+3. **Run the export script**:
+   ```bash
+   python backend/tools/export_cookies.py
+   ```
+4. **Restart the backend** - it will load the cookies automatically
+
+### Verify cookies are loaded:
+
+```bash
+curl http://127.0.0.1:8000/api/health
+# Should return: {"status":"ok","cookies_loaded":true}
+```
+
+### Reload cookies via API:
+
+```bash
+curl "http://127.0.0.1:8000/api/reload-cookies?browser=chrome"
+```
+
+### For Render/Production:
+
+1. Export cookies locally using the script
+2. Create a **Secret File** in Render dashboard
+3. Name it `cookies.txt` and paste the contents
+4. Mount path: `/etc/secrets/cookies.txt`
+
+⚠️ **Note**: Cookies expire! Re-export every 1-2 weeks or when you see bot detection errors.
+
+---
+
 ### Local Development
 
 ```bash

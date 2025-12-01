@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from simple_downloader import download_video, get_ydl_opts
+from simple_downloader import download_video, get_ydl_opts, COOKIES_FILE
 from exceptions import (
     BaseAPIError, InvalidURLError, MetadataError, DownloadError,
     DRMError, LiveStreamError, classify_ytdlp_error
@@ -9,6 +9,7 @@ from exceptions import (
 import yt_dlp
 import os
 import re
+import subprocess
 
 app = FastAPI()
 
@@ -19,6 +20,17 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
+
+
+# ========== STARTUP EVENT ==========
+@app.on_event("startup")
+async def startup_event():
+    """Check for cookies file on startup"""
+    if os.path.exists(COOKIES_FILE):
+        print(f"🍪 Loaded YouTube cookies from: {COOKIES_FILE}")
+    else:
+        print("⚠️ No cookies.txt found — YouTube may block video extraction.")
+        print("   Run: python tools/export_cookies.py to generate cookies.")
 
 
 # ========== GLOBAL EXCEPTION HANDLER ==========
@@ -60,7 +72,61 @@ def validate_youtube_url(url: str) -> bool:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    cookies_loaded = os.path.exists(COOKIES_FILE)
+    return {
+        "status": "ok",
+        "cookies_loaded": cookies_loaded
+    }
+
+
+@app.get("/api/reload-cookies")
+def reload_cookies(browser: str = "chrome"):
+    """
+    Reload cookies from browser. 
+    Supported browsers: chrome, edge, firefox, brave, opera
+    """
+    try:
+        # Run yt-dlp to export cookies
+        result = subprocess.run(
+            ["yt-dlp", "--cookies-from-browser", browser, "--cookies", COOKIES_FILE, "--skip-download", "https://www.youtube.com"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if os.path.exists(COOKIES_FILE):
+            return {
+                "status": "ok",
+                "message": f"Cookies exported from {browser}",
+                "path": COOKIES_FILE
+            }
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "COOKIE_EXPORT_FAILED",
+                    "message": f"Failed to export cookies from {browser}",
+                    "hint": "Make sure you're logged into YouTube in your browser."
+                }
+            )
+    except subprocess.TimeoutExpired:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "TIMEOUT",
+                "message": "Cookie export timed out",
+                "hint": "Try again or export manually."
+            }
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "COOKIE_ERROR",
+                "message": str(e),
+                "hint": "Run manually: python tools/export_cookies.py"
+            }
+        )
 
 
 @app.get("/api/metadata")
