@@ -14,6 +14,18 @@
     <button onclick="getInfo()">Get Info</button>
 
     <div id="info"></div>
+    <div id="loading" style="display:none;">Loading...</div>
+</div>
+
+<!-- Error Modal -->
+<div id="errorModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div class="modal-icon">❌</div>
+        <h2>Cannot download this video</h2>
+        <p id="errorMessage">This video may be restricted or DRM-protected.</p>
+        <button onclick="closeModal()">OK</button>
+    </div>
 </div>
 
 <script src="script.js"></script>
