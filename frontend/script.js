@@ -1,5 +1,7 @@
 const API = "http://127.0.0.1:8000/api";
 
+let selectedFolder = null;
+
 const urlInput = document.getElementById("url");
 const infoDiv = document.getElementById("info");
 const loading = document.getElementById("loading");
@@ -25,6 +27,26 @@ document.addEventListener("click", async () => {
         console.log("Clipboard read blocked");
     }
 });
+
+/* ---------- SELECT DOWNLOAD FOLDER ---------- */
+async function selectFolder() {
+    if (!window.showDirectoryPicker) {
+        alert("Folder selection is only supported in Chrome / Edge.");
+        return;
+    }
+
+    try {
+        selectedFolder = await window.showDirectoryPicker();
+        localStorage.setItem("downloadFolder", "selected");
+
+        document.getElementById("folderPath").textContent = "Folder selected ✔";
+        alert("Folder selected successfully!");
+
+    } catch (err) {
+        console.log(err);
+        alert("Folder selection cancelled.");
+    }
+}
 
 /* ---------- FETCH METADATA ---------- */
 async function getInfo() {
@@ -71,7 +93,7 @@ async function download(encodedUrl, format) {
     progressContainer.classList.remove("hidden");
     progressBar.style.width = "0%";
 
-    // Simulated progress (backend does not send progress)
+    // Simulated progress
     let progress = 0;
     const interval = setInterval(() => {
         if (progress < 90) {
@@ -81,22 +103,28 @@ async function download(encodedUrl, format) {
     }, 200);
 
     try {
-        // Trigger download via browser navigation
         const downloadUrl = `${API}/download?url=${encodeURIComponent(url)}&format_id=${format}`;
-        
-        // Check if download will work first
-        const res = await fetch(downloadUrl, { method: 'HEAD' }).catch(() => null);
-        
-        clearInterval(interval);
-        progressBar.style.width = "100%";
-        
-        // Save to history
-        const title = document.querySelector('.video-title')?.textContent || url;
-        saveToHistory(title);
-        
-        // Trigger actual download
-        window.location.href = downloadUrl;
-        
+
+        // If folder selected → save to that folder
+        if (selectedFolder) {
+            await saveToSelectedFolder(downloadUrl);
+            clearInterval(interval);
+            progressBar.style.width = "100%";
+            
+            const title = document.querySelector('.video-title')?.textContent || url;
+            saveToHistory(title);
+            alert("Downloaded to selected folder!");
+        } else {
+            // Default browser download
+            clearInterval(interval);
+            progressBar.style.width = "100%";
+            
+            const title = document.querySelector('.video-title')?.textContent || url;
+            saveToHistory(title);
+            
+            window.location.href = downloadUrl;
+        }
+
         setTimeout(() => {
             progressContainer.classList.add("hidden");
         }, 1500);
@@ -105,6 +133,36 @@ async function download(encodedUrl, format) {
         clearInterval(interval);
         progressContainer.classList.add("hidden");
         errorDiv.textContent = "Error downloading video.";
+    }
+}
+
+/* ---------- SAVE FILE TO SELECTED FOLDER ---------- */
+async function saveToSelectedFolder(fileURL) {
+    try {
+        const response = await fetch(fileURL);
+        const blob = await response.blob();
+
+        // Extract filename from Content-Disposition or URL
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let fileName = 'video.mp4';
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="?([^"]+)"?/);
+            if (match) fileName = match[1];
+        } else {
+            fileName = fileURL.split("/").pop().split("?")[0] || 'video.mp4';
+        }
+
+        const fileHandle = await selectedFolder.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+
+        await writable.write(blob);
+        await writable.close();
+
+        console.log("Saved to selected folder:", fileName);
+    } catch (err) {
+        console.log(err);
+        alert("Unable to save directly. Falling back to normal download.");
+        window.location.href = fileURL;
     }
 }
 

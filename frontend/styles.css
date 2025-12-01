@@ -93,6 +93,27 @@ h1 {
 .primary:hover {
     background: #2563eb;
 }
+.outline {
+    background: transparent;
+    border: 2px solid #3b82f6;
+    color: #3b82f6;
+    margin-top: 10px;
+}
+.outline:hover {
+    background: #3b82f6;
+    color: white;
+}
+
+/* FOLDER PATH */
+.folder-path {
+    font-size: 14px;
+    margin-top: 8px;
+    text-align: center;
+    color: #333;
+}
+[data-theme="dark"] .folder-path {
+    color: #eee;
+}
 
 /* VIDEO CARD */
 .video-card {
