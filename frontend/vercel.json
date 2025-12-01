@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://yt-downloader-backend-ogpx.onrender.com/api/$1"
+    }
+  ]
+}
