@@ -1,31 +1,40 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="light">
 <head>
+    <meta charset="UTF-8">
     <title>YouTube Downloader</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div class="container">
-    <h1>YouTube Downloader</h1>
+<div class="app">
 
-    <input id="url" placeholder="Paste YouTube URL here">
+    <header>
+        <h1>YouTube Downloader</h1>
+        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+    </header>
 
-    <button onclick="getInfo()">Get Info</button>
+    <div class="card">
 
-    <div id="info"></div>
-    <div id="loading" style="display:none;">Loading...</div>
-</div>
+        <input id="url" class="input" type="text" placeholder="Paste YouTube URL here">
 
-<!-- Error Modal -->
-<div id="errorModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
-        <div class="modal-icon">❌</div>
-        <h2>Cannot download this video</h2>
-        <p id="errorMessage">This video may be restricted or DRM-protected.</p>
-        <button onclick="closeModal()">OK</button>
+        <button class="btn primary" onclick="getInfo()">Fetch Video</button>
+
+        <!-- Loading -->
+        <div id="loading" class="spinner hidden"></div>
+
+        <p id="error" class="error"></p>
+
+        <div id="info"></div>
+
+        <div id="progressContainer" class="progress hidden">
+            <div id="progressBar"></div>
+        </div>
     </div>
+
+    <h3 class="recent-title">Recent Downloads</h3>
+    <div id="history" class="history"></div>
+
 </div>
 
 <script src="script.js"></script>

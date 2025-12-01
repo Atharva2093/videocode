@@ -1,82 +1,127 @@
 const API = "http://127.0.0.1:8000/api";
 
-function showError(message) {
-    document.getElementById("errorMessage").textContent = message;
-    document.getElementById("errorModal").style.display = "flex";
+const urlInput = document.getElementById("url");
+const infoDiv = document.getElementById("info");
+const loading = document.getElementById("loading");
+const errorDiv = document.getElementById("error");
+const historyDiv = document.getElementById("history");
+const progressContainer = document.getElementById("progressContainer");
+const progressBar = document.getElementById("progressBar");
+
+/* ---------- DARK MODE ---------- */
+function toggleTheme() {
+    const html = document.documentElement;
+    html.dataset.theme = html.dataset.theme === "dark" ? "light" : "dark";
 }
 
-function closeModal() {
-    document.getElementById("errorModal").style.display = "none";
-}
+/* ---------- URL AUTODETECT (Clipboard) ---------- */
+document.addEventListener("click", async () => {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (text.includes("youtube.com") || text.includes("youtu.be")) {
+            urlInput.value = text;
+        }
+    } catch (err) {
+        console.log("Clipboard read blocked");
+    }
+});
 
-function showLoading(show) {
-    document.getElementById("loading").style.display = show ? "block" : "none";
-}
-
+/* ---------- FETCH METADATA ---------- */
 async function getInfo() {
-    const url = document.getElementById("url").value.trim();
-    
+    const url = urlInput.value.trim();
+    errorDiv.textContent = "";
+    infoDiv.innerHTML = "";
+
     if (!url) {
-        showError("Please enter a YouTube URL");
+        errorDiv.textContent = "Please paste a YouTube URL.";
         return;
     }
-    
-    showLoading(true);
-    document.getElementById("info").innerHTML = "";
-    
+
+    loading.classList.remove("hidden");
+
     try {
         const res = await fetch(`${API}/metadata?url=${encodeURIComponent(url)}`);
         const data = await res.json();
-        
-        if (data.error) {
-            showError(data.error);
-            showLoading(false);
+
+        loading.classList.add("hidden");
+
+        if (data.detail || data.error) {
+            errorDiv.textContent = data.error || "Invalid video or DRM protected.";
             return;
         }
-        
-        showLoading(false);
-        document.getElementById("info").innerHTML = `
-            <h2>${data.title}</h2>
-            <img src="${data.thumbnail}" alt="Thumbnail">
-            ${data.duration ? `<p>Duration: ${Math.floor(data.duration / 60)}:${(data.duration % 60).toString().padStart(2, '0')}</p>` : ''}
-            <button onclick="downloadVideo('${encodeURIComponent(url)}')">Download Video</button>
+
+        infoDiv.innerHTML = `
+            <div class="video-card">
+                <img src="${data.thumbnail}">
+                <p class="video-title">${data.title}</p>
+                <button class="btn primary" onclick="download('${encodeURIComponent(url)}', 'best')">Download MP4</button>
+                <button class="btn primary" style="margin-top:10px;background:#10b981" onclick="download('${encodeURIComponent(url)}', 'mp3')">Download MP3</button>
+            </div>
         `;
-    } catch (err) {
-        showLoading(false);
-        showError("Failed to connect to server. Make sure the backend is running.");
+
+    } catch (error) {
+        loading.classList.add("hidden");
+        errorDiv.textContent = "Error fetching video.";
     }
 }
 
-function downloadVideo(encodedUrl) {
-    // Decode then re-encode to ensure proper formatting
+/* ---------- DOWNLOAD WITH PROGRESS ---------- */
+async function download(encodedUrl, format) {
     const url = decodeURIComponent(encodedUrl);
-    showLoading(true);
-    
-    // Create a hidden iframe to trigger download without leaving page
-    const downloadUrl = `${API}/download?url=${encodeURIComponent(url)}`;
-    
-    // Use fetch to check for errors first
-    fetch(downloadUrl)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.error || "Download failed");
-                });
-            }
-            // If response is OK, trigger actual download
-            window.location.href = downloadUrl;
-            showLoading(false);
-        })
-        .catch(err => {
-            showLoading(false);
-            showError(err.message || "Download failed. This video may be restricted or DRM-protected.");
-        });
-}
+    progressContainer.classList.remove("hidden");
+    progressBar.style.width = "0%";
 
-// Close modal when clicking outside
-window.onclick = function(event) {
-    const modal = document.getElementById("errorModal");
-    if (event.target === modal) {
-        closeModal();
+    // Simulated progress (backend does not send progress)
+    let progress = 0;
+    const interval = setInterval(() => {
+        if (progress < 90) {
+            progress += 5;
+            progressBar.style.width = progress + "%";
+        }
+    }, 200);
+
+    try {
+        // Trigger download via browser navigation
+        const downloadUrl = `${API}/download?url=${encodeURIComponent(url)}&format_id=${format}`;
+        
+        // Check if download will work first
+        const res = await fetch(downloadUrl, { method: 'HEAD' }).catch(() => null);
+        
+        clearInterval(interval);
+        progressBar.style.width = "100%";
+        
+        // Save to history
+        const title = document.querySelector('.video-title')?.textContent || url;
+        saveToHistory(title);
+        
+        // Trigger actual download
+        window.location.href = downloadUrl;
+        
+        setTimeout(() => {
+            progressContainer.classList.add("hidden");
+        }, 1500);
+
+    } catch (error) {
+        clearInterval(interval);
+        progressContainer.classList.add("hidden");
+        errorDiv.textContent = "Error downloading video.";
     }
 }
+
+/* ---------- RECENT DOWNLOAD HISTORY ---------- */
+function saveToHistory(file) {
+    let history = JSON.parse(localStorage.getItem("history") || "[]");
+    history.unshift({ file, time: new Date().toLocaleString() });
+    if (history.length > 5) history.pop();
+    localStorage.setItem("history", JSON.stringify(history));
+    renderHistory();
+}
+
+function renderHistory() {
+    let history = JSON.parse(localStorage.getItem("history") || "[]");
+    historyDiv.innerHTML = history
+        .map(h => `<div class="history-item">${h.file}<br><small>${h.time}</small></div>`)
+        .join("");
+}
+
+renderHistory();
