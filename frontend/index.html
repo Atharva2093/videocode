@@ -18,6 +18,12 @@
 
         <input id="url" class="input" type="text" placeholder="Paste YouTube URL here">
 
+        <!-- Format Selector -->
+        <div class="format-selector">
+            <button id="btnMp4" class="format-btn active" onclick="setFormat('mp4')">MP4</button>
+            <button id="btnMp3" class="format-btn" onclick="setFormat('mp3')">MP3</button>
+        </div>
+
         <button class="btn primary" onclick="getInfo()">Fetch Video</button>
 
         <button class="btn outline" onclick="selectFolder()">Select Download Folder</button>
@@ -29,6 +35,14 @@
         <p id="error" class="error"></p>
 
         <div id="info"></div>
+
+        <!-- Quality Selector (shown after fetching video) -->
+        <div id="qualitySelector" class="quality-selector hidden"></div>
+
+        <!-- Download Button (shown after fetching video) -->
+        <button id="downloadBtn" class="btn primary download-btn hidden" onclick="startDownload()">
+            Download
+        </button>
 
         <div id="progressContainer" class="progress hidden">
             <div id="progressBar"></div>

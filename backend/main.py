@@ -58,6 +58,7 @@ def metadata(url: str):
                     "id": f["format_id"],
                     "ext": f.get("ext", "mp4"),
                     "quality": f.get("height"),
+                    "height": f.get("height"),
                     "filesize": f.get("filesize"),
                 })
             

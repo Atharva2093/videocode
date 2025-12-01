@@ -42,6 +42,9 @@ def download_video(url, format_id="best"):
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }]
+    elif format_id and format_id.startswith("best[height"):
+        # Quality-based format (e.g., "best[height<=720]")
+        ydl_opts["format"] = f"{format_id}+bestaudio[ext=m4a]/best[ext=mp4]/best"
     elif format_id and format_id != "best":
         ydl_opts["format"] = f"{format_id}+bestaudio/best"
     else:

@@ -1,6 +1,10 @@
-const API = "http://127.0.0.1:8000/api";
+const API = "https://yt-downloader-backend.onrender.com/api";
 
 let selectedFolder = null;
+let selectedFormat = "mp4";
+let selectedQuality = "720p";
+let currentVideoUrl = "";
+let availableQualities = [];
 
 const urlInput = document.getElementById("url");
 const infoDiv = document.getElementById("info");
@@ -9,6 +13,8 @@ const errorDiv = document.getElementById("error");
 const historyDiv = document.getElementById("history");
 const progressContainer = document.getElementById("progressContainer");
 const progressBar = document.getElementById("progressBar");
+const qualitySelector = document.getElementById("qualitySelector");
+const downloadBtn = document.getElementById("downloadBtn");
 
 /* ---------- DARK MODE ---------- */
 function toggleTheme() {
@@ -48,11 +54,59 @@ async function selectFolder() {
     }
 }
 
+/* ---------- FORMAT SELECTION ---------- */
+function setFormat(format) {
+    selectedFormat = format;
+    document.getElementById("btnMp4").classList.toggle("active", format === "mp4");
+    document.getElementById("btnMp3").classList.toggle("active", format === "mp3");
+    
+    // Show/hide quality selector (only for MP4)
+    if (format === "mp4" && availableQualities.length > 0) {
+        qualitySelector.classList.remove("hidden");
+    } else {
+        qualitySelector.classList.add("hidden");
+    }
+}
+
+/* ---------- QUALITY SELECTION ---------- */
+function setQuality(quality) {
+    selectedQuality = quality;
+    document.querySelectorAll(".quality-chip").forEach(chip => {
+        chip.classList.toggle("active", chip.dataset.quality === quality);
+    });
+}
+
+/* ---------- RENDER QUALITY CHIPS ---------- */
+function renderQualityChips(formats) {
+    // Extract available qualities from formats
+    const qualitySet = new Set();
+    formats.forEach(f => {
+        if (f.height) {
+            qualitySet.add(f.height + "p");
+        }
+    });
+    
+    availableQualities = Array.from(qualitySet).sort((a, b) => parseInt(b) - parseInt(a));
+    
+    // Default to 720p or highest available
+    if (availableQualities.includes("720p")) {
+        selectedQuality = "720p";
+    } else if (availableQualities.length > 0) {
+        selectedQuality = availableQualities[0];
+    }
+    
+    qualitySelector.innerHTML = availableQualities.map(q => 
+        `<button class="quality-chip ${q === selectedQuality ? 'active' : ''}" data-quality="${q}" onclick="setQuality('${q}')">${q}</button>`
+    ).join("");
+}
+
 /* ---------- FETCH METADATA ---------- */
 async function getInfo() {
     const url = urlInput.value.trim();
     errorDiv.textContent = "";
     infoDiv.innerHTML = "";
+    qualitySelector.classList.add("hidden");
+    downloadBtn.classList.add("hidden");
 
     if (!url) {
         errorDiv.textContent = "Please paste a YouTube URL.";
@@ -72,14 +126,26 @@ async function getInfo() {
             return;
         }
 
+        currentVideoUrl = url;
+
+        // Render video card
         infoDiv.innerHTML = `
             <div class="video-card">
                 <img src="${data.thumbnail}">
                 <p class="video-title">${data.title}</p>
-                <button class="btn primary" onclick="download('${encodeURIComponent(url)}', 'best')">Download MP4</button>
-                <button class="btn primary" style="margin-top:10px;background:#10b981" onclick="download('${encodeURIComponent(url)}', 'mp3')">Download MP3</button>
             </div>
         `;
+
+        // Render quality chips for MP4
+        if (data.formats && data.formats.length > 0) {
+            renderQualityChips(data.formats);
+            if (selectedFormat === "mp4") {
+                qualitySelector.classList.remove("hidden");
+            }
+        }
+
+        // Show download button
+        downloadBtn.classList.remove("hidden");
 
     } catch (error) {
         loading.classList.add("hidden");
@@ -87,20 +153,26 @@ async function getInfo() {
     }
 }
 
+/* ---------- START DOWNLOAD ---------- */
+function startDownload() {
+    const formatId = selectedFormat === "mp3" ? "mp3" : `best[height<=${parseInt(selectedQuality)}]`;
+    download(currentVideoUrl, formatId);
+}
+
 /* ---------- DOWNLOAD WITH PROGRESS ---------- */
-async function download(encodedUrl, format) {
-    const url = decodeURIComponent(encodedUrl);
+async function download(url, format) {
     progressContainer.classList.remove("hidden");
     progressBar.style.width = "0%";
+    progressBar.classList.add("animated");
 
-    // Simulated progress
+    // Animated progress
     let progress = 0;
     const interval = setInterval(() => {
         if (progress < 90) {
-            progress += 5;
-            progressBar.style.width = progress + "%";
+            progress += Math.random() * 8;
+            progressBar.style.width = Math.min(progress, 90) + "%";
         }
-    }, 200);
+    }, 300);
 
     try {
         const downloadUrl = `${API}/download?url=${encodeURIComponent(url)}&format_id=${format}`;
@@ -126,11 +198,13 @@ async function download(encodedUrl, format) {
         }
 
         setTimeout(() => {
+            progressBar.classList.remove("animated");
             progressContainer.classList.add("hidden");
         }, 1500);
 
     } catch (error) {
         clearInterval(interval);
+        progressBar.classList.remove("animated");
         progressContainer.classList.add("hidden");
         errorDiv.textContent = "Error downloading video.";
     }
