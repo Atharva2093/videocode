@@ -1,0 +1,30 @@
+body {
+    font-family: Arial, sans-serif;
+    background: #fafafa;
+    text-align: center;
+    padding: 50px;
+}
+
+.container {
+    width: 400px;
+    margin: auto;
+}
+
+input {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+}
+
+button {
+    padding: 12px 20px;
+    width: 100%;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+#info img {
+    width: 100%;
+    margin-top: 15px;
+    border-radius: 10px;
+}
