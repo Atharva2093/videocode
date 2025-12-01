@@ -3,8 +3,6 @@ const API =
         ? "http://127.0.0.1:8000/api"
         : "https://yt-downloader-backend-ogpx.onrender.com/api";
 
-console.log("DEBUG: Using API =", API);
-
 /* -------------------------------------------
    GLOBAL VARIABLES
 -------------------------------------------- */
@@ -70,7 +68,7 @@ document.addEventListener("click", async () => {
             urlInput.value = text;
         }
     } catch (err) {
-        console.log("Clipboard access denied");
+        // Clipboard access denied - silent fail
     }
 });
 
@@ -88,7 +86,6 @@ async function selectFolder() {
         document.getElementById("folderPath").textContent = "Folder selected ✔";
         alert("Folder selected!");
     } catch (err) {
-        console.log(err);
         alert("Folder selection cancelled.");
     }
 }
@@ -292,3 +289,17 @@ function renderHistory() {
 }
 
 renderHistory();
+
+/* -------------------------------------------
+   HEALTH CHECK ON LOAD
+-------------------------------------------- */
+fetch(`${API}/health`)
+    .then((res) => res.json())
+    .then((data) => {
+        if (data.status === "ok") {
+            console.log("✅ Backend connected:", API);
+        }
+    })
+    .catch(() => {
+        console.warn("⚠️ Backend unavailable:", API);
+    });
