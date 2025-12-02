@@ -18,8 +18,8 @@ let selectedQuality = null;
 let selectedFormatId = null;  // The actual format_id to send to backend
 let currentVideoData = null;
 let currentVideoUrl = "";
-let selectedFolder = null;
 let qualityToFormatMap = {};  // Maps height -> best format_id for that height
+let pendingDownloadFolder = null;  // Folder selected in modal
 
 // ========================================
 // DOM ELEMENTS
@@ -38,8 +38,6 @@ const videoDuration = document.getElementById("videoDuration");
 const qualitySection = document.getElementById("qualitySection");
 const qualityChips = document.getElementById("qualityChips");
 const downloadSection = document.getElementById("downloadSection");
-const folderBtn = document.getElementById("folderBtn");
-const folderStatus = document.getElementById("folderStatus");
 const downloadBtn = document.getElementById("downloadBtn");
 const progressSection = document.getElementById("progressSection");
 const progressFill = document.getElementById("progressFill");
@@ -47,6 +45,7 @@ const progressText = document.getElementById("progressText");
 const successBox = document.getElementById("successBox");
 const recentList = document.getElementById("recentList");
 const connectionStatus = document.getElementById("connectionStatus");
+const downloadModal = document.getElementById("downloadModal");
 
 // ========================================
 // INITIALIZATION
@@ -55,7 +54,6 @@ document.addEventListener("DOMContentLoaded", () => {
     checkConnection();
     renderRecentDownloads();
     setupEventListeners();
-    checkFolderPickerSupport();
 });
 
 function setupEventListeners() {
@@ -69,11 +67,12 @@ function setupEventListeners() {
     urlInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") fetchVideo();
     });
-}
-
-function checkFolderPickerSupport() {
-    if (window.showDirectoryPicker) {
-        folderBtn.classList.remove("hidden");
+    
+    // Close modal on overlay click
+    if (downloadModal) {
+        downloadModal.addEventListener("click", (e) => {
+            if (e.target === downloadModal) hideDownloadModal();
+        });
     }
 }
 
@@ -339,26 +338,71 @@ function displayVideoInfo(data) {
 // ========================================
 async function selectFolder() {
     if (!window.showDirectoryPicker) {
-        return;
+        return null;
     }
     
     try {
-        selectedFolder = await window.showDirectoryPicker();
-        folderStatus.textContent = "📁 Folder selected";
-        folderStatus.classList.remove("hidden");
+        return await window.showDirectoryPicker();
     } catch (err) {
-        // User cancelled - silent
+        // User cancelled
+        return null;
     }
 }
 
 // ========================================
-// DOWNLOAD
+// DOWNLOAD MODAL
 // ========================================
-async function startDownload() {
+function showDownloadModal() {
+    // Only show folder option if browser supports it
+    const folderBtn = document.getElementById("modalFolderBtn");
+    if (folderBtn) {
+        folderBtn.style.display = window.showDirectoryPicker ? "flex" : "none";
+    }
+    downloadModal.classList.remove("hidden");
+}
+
+function hideDownloadModal() {
+    downloadModal.classList.add("hidden");
+}
+
+// Called when user clicks "Select Folder" in modal
+async function handleFolderDownload() {
+    hideDownloadModal();
+    
+    const folder = await selectFolder();
+    if (!folder) {
+        // User cancelled folder picker, do nothing
+        return;
+    }
+    
+    pendingDownloadFolder = folder;
+    executeDownload(true);
+}
+
+// Called when user clicks "Download Normally" in modal
+function handleNormalDownload() {
+    hideDownloadModal();
+    pendingDownloadFolder = null;
+    executeDownload(false);
+}
+
+// ========================================
+// DOWNLOAD - Entry Point
+// ========================================
+function startDownload() {
     if (!currentVideoUrl) return;
     
     hideError();
     hideSuccess();
+    
+    // Show modal to choose download method
+    showDownloadModal();
+}
+
+// ========================================
+// DOWNLOAD - Execute
+// ========================================
+async function executeDownload(useFolder) {
     showProgress();
     updateProgress(0);
     
@@ -369,84 +413,100 @@ async function startDownload() {
     
     const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
     
+    // Generate filename early
+    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
+    const safeName = (currentVideoData?.title || "video").replace(/[^a-zA-Z0-9\s]/g, "").trim().substring(0, 50) || "video";
+    const fallbackFileName = safeName + ext;
+    
     try {
-        const response = await fetch(downloadUrl);
-        
-        // Check for error response
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            const data = await response.json();
-            hideProgress();
-            showError(data.message || data.error, data.hint || "");
-            return;
-        }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        // Get filename from Content-Disposition header
-        const fileName = getFileName(response, currentVideoData?.title);
-        
-        // Get content length for progress (if available)
-        const contentLength = response.headers.get("content-length");
-        const totalSize = contentLength ? parseInt(contentLength) : null;
-        
-        if (selectedFolder) {
-            // Download to selected folder using File System Access API with streaming
-            await downloadToFolder(response, fileName, totalSize);
+        if (useFolder && pendingDownloadFolder) {
+            // Streaming download to folder
+            await downloadToFolderStreaming(downloadUrl, fallbackFileName);
         } else {
-            // Fallback: Browser download
-            await downloadWithBlob(response, fileName, totalSize);
+            // Normal browser download - instant, no waiting
+            triggerBrowserDownload(downloadUrl, fallbackFileName);
         }
-        
-        updateProgress(100);
-        setTimeout(() => {
-            hideProgress();
-            showSuccess();
-            saveToHistory(currentVideoData?.title || currentVideoUrl);
-        }, 300);
-        
     } catch (err) {
         console.error("Download error:", err);
         hideProgress();
         
-        // If folder download failed, try fallback
-        if (selectedFolder && err.message !== "User cancelled") {
-            showError("Folder save failed, trying browser download...", "");
-            selectedFolder = null;
-            folderStatus.classList.add("hidden");
-            setTimeout(() => startDownload(), 500);
-            return;
+        // If folder download failed, offer fallback
+        if (useFolder) {
+            showError("Folder save failed. Try 'Download Normally' instead.", "");
+        } else {
+            showError("Download failed", err.message || "Please try again");
         }
-        
-        showError("Download failed", err.message || "Please try again");
     }
 }
 
-// Download to selected folder using streaming
-async function downloadToFolder(response, fileName, totalSize) {
+// ========================================
+// INSTANT BROWSER DOWNLOAD
+// ========================================
+function triggerBrowserDownload(url, fallbackName) {
+    // Create invisible link and click it - instant download start
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fallbackName;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    // Show success after a short delay (download has started)
+    updateProgress(100);
+    setTimeout(() => {
+        hideProgress();
+        showSuccess();
+        saveToHistory(currentVideoData?.title || currentVideoUrl);
+    }, 500);
+}
+
+// ========================================
+// STREAMING DOWNLOAD TO FOLDER
+// ========================================
+async function downloadToFolderStreaming(url, fallbackFileName) {
+    const response = await fetch(url);
+    
+    // Check for error response (JSON)
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+        const data = await response.json();
+        hideProgress();
+        showError(data.message || data.error || "Download failed", data.hint || "");
+        return;
+    }
+    
+    if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+    }
+    
+    // Get filename from header or use fallback
+    const fileName = getFileNameFromResponse(response) || fallbackFileName;
+    
+    // Get content length for progress
+    const contentLength = response.headers.get("content-length");
+    const totalSize = contentLength ? parseInt(contentLength) : null;
+    
     try {
-        // Verify we still have permission
-        const permission = await selectedFolder.queryPermission({ mode: "readwrite" });
+        // Verify folder permission
+        const permission = await pendingDownloadFolder.queryPermission({ mode: "readwrite" });
         if (permission !== "granted") {
-            const requestResult = await selectedFolder.requestPermission({ mode: "readwrite" });
-            if (requestResult !== "granted") {
+            const result = await pendingDownloadFolder.requestPermission({ mode: "readwrite" });
+            if (result !== "granted") {
                 throw new Error("Folder permission denied");
             }
         }
         
-        // Create file handle
-        const fileHandle = await selectedFolder.getFileHandle(fileName, { create: true });
+        // Create file and get writable stream
+        const fileHandle = await pendingDownloadFolder.getFileHandle(fileName, { create: true });
         const writable = await fileHandle.createWritable();
         
-        // Stream the response body
+        // Stream the response
         const reader = response.body.getReader();
         let receivedBytes = 0;
         
         while (true) {
             const { done, value } = await reader.read();
-            
             if (done) break;
             
             await writable.write(value);
@@ -457,70 +517,34 @@ async function downloadToFolder(response, fileName, totalSize) {
                 const percent = (receivedBytes / totalSize) * 100;
                 updateProgress(Math.min(percent, 99));
             } else {
-                // No content-length, show indeterminate progress
-                updateProgress(Math.min(receivedBytes / 1000000 * 10, 90));
+                // Estimate progress without content-length
+                updateProgress(Math.min(50 + (receivedBytes / 10000000) * 40, 95));
             }
         }
         
         await writable.close();
         
-        // Update folder status
-        folderStatus.textContent = "✅ Saved to selected folder";
-        folderStatus.classList.remove("hidden");
+        // Success
+        updateProgress(100);
+        setTimeout(() => {
+            hideProgress();
+            showSuccess();
+            saveToHistory(currentVideoData?.title || currentVideoUrl);
+        }, 300);
         
     } catch (err) {
-        console.error("Folder save error:", err);
+        console.error("Folder streaming error:", err);
         throw err;
     }
 }
 
-// Fallback: Download using blob and trigger browser download
-async function downloadWithBlob(response, fileName, totalSize) {
-    const reader = response.body.getReader();
-    const chunks = [];
-    let receivedBytes = 0;
-    
-    while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) break;
-        
-        chunks.push(value);
-        receivedBytes += value.length;
-        
-        // Update progress
-        if (totalSize) {
-            const percent = (receivedBytes / totalSize) * 100;
-            updateProgress(Math.min(percent, 99));
-        } else {
-            updateProgress(Math.min(receivedBytes / 1000000 * 10, 90));
-        }
-    }
-    
-    // Create blob and download
-    const blob = new Blob(chunks);
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    URL.revokeObjectURL(url);
-}
-
-function getFileName(response, title) {
+function getFileNameFromResponse(response) {
     const contentDisposition = response.headers.get("content-disposition");
     if (contentDisposition) {
-        const match = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (match) return match[1];
+        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
+        if (match) return match[1].trim();
     }
-    
-    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
-    const safeName = (title || "video").replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50);
-    return safeName + ext;
+    return null;
 }
 
 // ========================================
@@ -584,6 +608,7 @@ function resetUI() {
     hideError();
     hideSuccess();
     hideProgress();
+    hideDownloadModal();
     videoPreview.classList.add("hidden");
     qualitySection.classList.add("hidden");
     downloadSection.classList.add("hidden");
@@ -591,6 +616,7 @@ function resetUI() {
     qualityToFormatMap = {};
     selectedQuality = null;
     selectedFormatId = null;
+    pendingDownloadFolder = null;
 }
 
 // ========================================

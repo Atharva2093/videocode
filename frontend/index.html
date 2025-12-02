@@ -83,11 +83,6 @@
 
         <!-- Step 4: Download Actions -->
         <section id="downloadSection" class="step step-4 hidden">
-            <button id="folderBtn" class="btn btn-secondary hidden" onclick="selectFolder()">
-                📁 Select Folder
-            </button>
-            <p id="folderStatus" class="folder-status hidden"></p>
-            
             <button id="downloadBtn" class="btn btn-download" onclick="startDownload()">
                 ⬇️ Download
             </button>
@@ -106,6 +101,23 @@
             ✅ Download complete!
         </div>
     </main>
+
+    <!-- Download Method Modal -->
+    <div id="downloadModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 class="modal-title">Choose Download Method</h3>
+            <p class="modal-text">Where would you like to save the file?</p>
+            <div class="modal-buttons">
+                <button id="modalFolderBtn" class="btn btn-secondary" onclick="handleFolderDownload()">
+                    📁 Select Folder
+                </button>
+                <button id="modalNormalBtn" class="btn btn-primary" onclick="handleNormalDownload()">
+                    ⬇️ Download Normally
+                </button>
+            </div>
+            <button class="modal-close" onclick="hideDownloadModal()">✕</button>
+        </div>
+    </div>
 
     <!-- Recent Downloads -->
     <section class="recent-section">
