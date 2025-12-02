@@ -1,7 +1,18 @@
+"""
+YouTube Downloader API - FastAPI Backend
+Clean, minimal implementation.
+"""
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-from simple_downloader import download_video, get_ydl_opts, get_ffmpeg_location, COOKIES_FILE
+from fastapi.responses import StreamingResponse, JSONResponse
+from simple_downloader import (
+    download_video, 
+    check_ffmpeg, 
+    check_ffprobe, 
+    cleanup_old_files,
+    COOKIES_FILE
+)
 from exceptions import (
     BaseAPIError, InvalidURLError, MetadataError, DownloadError,
     DRMError, LiveStreamError, classify_ytdlp_error
@@ -9,32 +20,42 @@ from exceptions import (
 import yt_dlp
 import os
 import re
-import subprocess
-import shutil
 
-app = FastAPI()
+app = FastAPI(title="YouTube Downloader API")
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
+    expose_headers=["Content-Disposition", "Content-Length"],
 )
 
 
-# ========== STARTUP EVENT ==========
+# ========================================
+# STARTUP
+# ========================================
 @app.on_event("startup")
 async def startup_event():
-    """Check for cookies file on startup"""
+    """Initialize on startup."""
     if os.path.exists(COOKIES_FILE):
-        print(f"🍪 Loaded YouTube cookies from: {COOKIES_FILE}")
+        print(f"🍪 Cookies loaded: {COOKIES_FILE}")
     else:
-        print("⚠️ No cookies.txt found — YouTube may block video extraction.")
-        print("   Run: python tools/export_cookies.py to generate cookies.")
+        print("⚠️ No cookies.txt found")
+    
+    if check_ffmpeg():
+        print("✅ FFmpeg available")
+    else:
+        print("⚠️ FFmpeg not found - MP3 conversion won't work")
+    
+    # Cleanup old downloads
+    cleanup_old_files(max_age_hours=1)
 
 
-# ========== GLOBAL EXCEPTION HANDLER ==========
+# ========================================
+# EXCEPTION HANDLERS
+# ========================================
 @app.exception_handler(BaseAPIError)
 async def api_error_handler(request: Request, exc: BaseAPIError):
     return JSONResponse(
@@ -49,19 +70,24 @@ async def api_error_handler(request: Request, exc: BaseAPIError):
 
 @app.exception_handler(Exception)
 async def generic_error_handler(request: Request, exc: Exception):
+    print(f"Unhandled error: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "error": "INTERNAL_ERROR",
-            "message": "An unexpected error occurred.",
+            "message": str(exc),
             "hint": "Please try again later."
         }
     )
 
 
-# ========== URL VALIDATION ==========
+# ========================================
+# HELPERS
+# ========================================
 def validate_youtube_url(url: str) -> bool:
-    """Check if URL is a valid YouTube link"""
+    """Validate YouTube URL format."""
+    if not url:
+        return False
     patterns = [
         r'(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+',
         r'(https?://)?(www\.)?youtu\.be/[\w-]+',
@@ -71,97 +97,37 @@ def validate_youtube_url(url: str) -> bool:
     return any(re.match(pattern, url) for pattern in patterns)
 
 
+def sanitize_filename(name: str) -> str:
+    """Remove illegal characters from filename."""
+    if not name:
+        return "video"
+    # Remove illegal chars
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', name)
+    # Collapse whitespace
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Limit length
+    return name[:100] if len(name) > 100 else name
+
+
+# ========================================
+# ROUTES
+# ========================================
 @app.get("/api/health")
 def health():
-    cookies_loaded = os.path.exists(COOKIES_FILE)
-    
-    # Check FFmpeg availability
-    ffmpeg_location = get_ffmpeg_location()
-    ffmpeg_available = ffmpeg_location is not None
-    
-    # Try to get FFmpeg version
-    ffmpeg_version = None
-    if ffmpeg_available:
-        try:
-            result = subprocess.run(
-                ["ffmpeg", "-version"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                # Extract first line of version info
-                ffmpeg_version = result.stdout.split('\n')[0]
-        except Exception:
-            pass
-    
+    """Health check endpoint."""
     return {
         "status": "ok",
-        "cookies_loaded": cookies_loaded,
-        "ffmpeg_available": ffmpeg_available,
-        "ffmpeg_location": ffmpeg_location,
-        "ffmpeg_version": ffmpeg_version
+        "ffmpeg": check_ffmpeg(),
+        "ffprobe": check_ffprobe()
     }
-
-
-@app.get("/api/reload-cookies")
-def reload_cookies(browser: str = "chrome"):
-    """
-    Reload cookies from browser. 
-    Supported browsers: chrome, edge, firefox, brave, opera
-    """
-    try:
-        # Run yt-dlp to export cookies
-        result = subprocess.run(
-            ["yt-dlp", "--cookies-from-browser", browser, "--cookies", COOKIES_FILE, "--skip-download", "https://www.youtube.com"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        
-        if os.path.exists(COOKIES_FILE):
-            return {
-                "status": "ok",
-                "message": f"Cookies exported from {browser}",
-                "path": COOKIES_FILE
-            }
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": "COOKIE_EXPORT_FAILED",
-                    "message": f"Failed to export cookies from {browser}",
-                    "hint": "Make sure you're logged into YouTube in your browser."
-                }
-            )
-    except subprocess.TimeoutExpired:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "TIMEOUT",
-                "message": "Cookie export timed out",
-                "hint": "Try again or export manually."
-            }
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "COOKIE_ERROR",
-                "message": str(e),
-                "hint": "Run manually: python tools/export_cookies.py"
-            }
-        )
 
 
 @app.get("/api/metadata")
 def metadata(url: str):
-    # Validate URL first
-    if not url or not validate_youtube_url(url):
+    """Get video metadata and available formats."""
+    if not validate_youtube_url(url):
         raise InvalidURLError()
     
-    # Use minimal options for metadata - don't restrict formats
-    # Important: Don't use player_client restriction here as it limits available formats
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
@@ -171,7 +137,6 @@ def metadata(url: str):
         "no_color": True,
     }
     
-    # Add cookies if file exists
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
     
@@ -182,19 +147,15 @@ def metadata(url: str):
             if not info:
                 raise MetadataError()
             
-            # Check for live streams
             if info.get("is_live"):
                 raise LiveStreamError()
             
-            # Collect ALL formats - video, audio, and combined
-            video_formats = []   # Video with or without audio
-            audio_formats = []   # Audio-only formats
+            # Collect formats
+            video_formats = []
+            audio_formats = []
             
             for f in info.get("formats", []):
-                # Skip formats without URLs or with DRM
-                if not f.get("url"):
-                    continue
-                if f.get("has_drm"):
+                if not f.get("url") or f.get("has_drm"):
                     continue
                 
                 format_id = f.get("format_id", "")
@@ -204,13 +165,12 @@ def metadata(url: str):
                 acodec = f.get("acodec", "none")
                 height = f.get("height")
                 fps = f.get("fps")
-                abr = f.get("abr")  # audio bitrate
+                abr = f.get("abr")
                 
                 has_video = vcodec != "none"
                 has_audio = acodec != "none"
                 
                 if has_video:
-                    # Video format (may or may not have audio)
                     video_formats.append({
                         "format_id": format_id,
                         "ext": ext,
@@ -220,8 +180,7 @@ def metadata(url: str):
                         "has_audio": has_audio,
                         "type": "video"
                     })
-                elif has_audio and not has_video:
-                    # Audio-only format
+                elif has_audio:
                     audio_formats.append({
                         "format_id": format_id,
                         "ext": ext,
@@ -230,8 +189,8 @@ def metadata(url: str):
                         "type": "audio"
                     })
             
-            # Check if all formats are DRM protected
-            if not video_formats and not audio_formats and info.get("formats"):
+            # Check for DRM
+            if not video_formats and not audio_formats:
                 has_drm = any(f.get("has_drm") for f in info.get("formats", []))
                 if has_drm:
                     raise DRMError()
@@ -246,51 +205,65 @@ def metadata(url: str):
             }
             
     except BaseAPIError:
-        # Re-raise our custom exceptions
         raise
     except Exception as e:
-        error_str = str(e)
-        
-        # Classify the yt-dlp error and raise appropriate exception
-        raise classify_ytdlp_error(error_str)
+        raise classify_ytdlp_error(str(e))
 
 
 @app.get("/api/download")
 def download(url: str, format_id: str = "best"):
-    # Validate URL first
-    if not url or not validate_youtube_url(url):
+    """Download video/audio and stream to client."""
+    if not validate_youtube_url(url):
         raise InvalidURLError()
     
     try:
+        # Download the file
         filepath = download_video(url, format_id)
+        
         if not filepath or not os.path.exists(filepath):
             raise DownloadError(
                 message="Download completed but file was not created.",
                 hint="Try again or select a different quality."
             )
         
+        # Get file info
         filename = os.path.basename(filepath)
-        
-        # Determine media type based on extension
+        filesize = os.path.getsize(filepath)
         ext = os.path.splitext(filename)[1].lower()
-        if ext == ".mp3":
-            media_type = "audio/mpeg"
-        elif ext == ".webm":
-            media_type = "video/webm"
-        else:
-            media_type = "video/mp4"
         
-        return FileResponse(
-            filepath,
-            media_type=media_type,
-            filename=filename,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        # Determine content type
+        if ext == ".mp3":
+            content_type = "audio/mpeg"
+        elif ext == ".webm":
+            content_type = "video/webm"
+        elif ext == ".m4a":
+            content_type = "audio/mp4"
+        else:
+            content_type = "video/mp4"
+        
+        # Stream the file
+        def file_iterator():
+            try:
+                with open(filepath, "rb") as f:
+                    while chunk := f.read(1024 * 1024):  # 1MB chunks
+                        yield chunk
+            finally:
+                # Clean up file after streaming
+                try:
+                    os.remove(filepath)
+                except Exception:
+                    pass
+        
+        return StreamingResponse(
+            file_iterator(),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Content-Length": str(filesize),
+            }
         )
+        
     except BaseAPIError:
-        # Re-raise our custom exceptions
         raise
     except Exception as e:
-        error_str = str(e)
-        
-        # Classify the yt-dlp error and raise appropriate exception
-        raise classify_ytdlp_error(error_str)
+        raise classify_ytdlp_error(str(e))

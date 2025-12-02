@@ -1,118 +1,122 @@
+"""
+Simple YouTube Downloader using yt-dlp
+Clean, minimal implementation for MP4 and MP3 downloads.
+"""
+
 import yt_dlp
 import os
 import uuid
 import shutil
 
-# Path to cookies file
+# ========================================
+# PATHS
+# ========================================
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+DOWNLOADS_DIR = os.path.join(BACKEND_DIR, "downloads")
 COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
 
-# Check for Render secrets path
+# Check for Render secrets path (production)
 RENDER_COOKIES = "/etc/secrets/cookies.txt"
 if os.path.exists(RENDER_COOKIES):
     COOKIES_FILE = RENDER_COOKIES
 
-
-def get_ffmpeg_location():
-    """
-    Find FFmpeg location - check system paths.
-    Render installs FFmpeg to /usr/bin via apt-get.
-    """
-    # Check common locations
-    locations = [
-        "/usr/bin",           # Render / Linux default
-        "/usr/local/bin",     # macOS / some Linux
-        "C:\\ffmpeg\\bin",    # Windows custom
-    ]
-    
-    for loc in locations:
-        ffmpeg_path = os.path.join(loc, "ffmpeg") if os.name != "nt" else os.path.join(loc, "ffmpeg.exe")
-        if os.path.exists(ffmpeg_path):
-            return loc
-    
-    # Check if ffmpeg is in PATH
-    ffmpeg_in_path = shutil.which("ffmpeg")
-    if ffmpeg_in_path:
-        return os.path.dirname(ffmpeg_in_path)
-    
-    return None  # Will let yt-dlp try to find it
+# Ensure downloads directory exists
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 
-def get_ydl_opts():
+def check_ffmpeg() -> bool:
+    """Check if ffmpeg is available in PATH."""
+    return shutil.which("ffmpeg") is not None
+
+
+def check_ffprobe() -> bool:
+    """Check if ffprobe is available in PATH."""
+    return shutil.which("ffprobe") is not None
+
+
+def download_video(url: str, format_id: str = "best") -> str:
     """
-    Optimized yt-dlp options with cookie support to bypass bot detection.
+    Download a YouTube video or audio.
+    
+    Args:
+        url: YouTube video URL
+        format_id: Either a specific format ID, "best", or "mp3"
+    
+    Returns:
+        Full path to the downloaded file
+    
+    Raises:
+        Exception: If download fails
     """
-    opts = {
+    # Generate unique filename
+    file_id = str(uuid.uuid4())
+    output_template = os.path.join(DOWNLOADS_DIR, f"{file_id}.%(ext)s")
+    
+    # Base options
+    ydl_opts = {
+        "outtmpl": output_template,
         "quiet": True,
         "no_warnings": True,
-        "format": "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best",
-        "merge_output_format": "mp4",
         "nocheckcertificate": True,
         "ignoreerrors": False,
         "no_color": True,
         "retries": 3,
         "fragment_retries": 3,
-        # Use iOS client - most reliable for bypassing restrictions
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["ios", "android", "web"],
-            }
-        },
     }
     
-    # Add FFmpeg location if found
-    ffmpeg_loc = get_ffmpeg_location()
-    if ffmpeg_loc:
-        opts["ffmpeg_location"] = ffmpeg_loc
-    
-    # Add cookies if file exists
+    # Add cookies if available
     if os.path.exists(COOKIES_FILE):
-        opts["cookiefile"] = COOKIES_FILE
+        ydl_opts["cookiefile"] = COOKIES_FILE
     
-    return opts
-
-
-def download_video(url, format_id="best"):
-    outdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloads")
-    os.makedirs(outdir, exist_ok=True)
-
-    file_id = str(uuid.uuid4())
-    filepath_template = os.path.join(outdir, f"{file_id}.%(ext)s")
-
-    ydl_opts = get_ydl_opts()
-    ydl_opts["outtmpl"] = filepath_template
-    
-    # Handle format selection
+    # Configure based on format
     if format_id == "mp3":
-        # MP3 conversion - requires FFmpeg
+        # MP3 audio extraction
         ydl_opts["format"] = "bestaudio/best"
         ydl_opts["postprocessors"] = [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }]
-        # Remove merge format for audio extraction
-        if "merge_output_format" in ydl_opts:
-            del ydl_opts["merge_output_format"]
     elif format_id and format_id != "best":
-        # Specific format_id - merge with best audio if video-only
-        ydl_opts["format"] = f"{format_id}+bestaudio[ext=m4a]/{format_id}+bestaudio/{format_id}/best"
-        ydl_opts["merge_output_format"] = "mp4"
+        # Specific video format - try to merge with best audio
+        ydl_opts["format"] = f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
     else:
-        ydl_opts["format"] = "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"
-
+        # Best available quality
+        ydl_opts["format"] = "bestvideo+bestaudio/best"
+    
+    # Download
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         
-        # Check for live stream issues
+        if not info:
+            raise Exception("Failed to extract video information")
+        
         if info.get("is_live"):
             raise Exception("Live streams cannot be downloaded")
     
-    # Find the downloaded file by matching the UUID
-    for f in os.listdir(outdir):
-        if f.startswith(file_id):
-            full_path = os.path.join(outdir, f)
-            if os.path.exists(full_path):
-                return full_path
+    # Find the downloaded file
+    for filename in os.listdir(DOWNLOADS_DIR):
+        if filename.startswith(file_id):
+            filepath = os.path.join(DOWNLOADS_DIR, filename)
+            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
+                return filepath
     
-    raise Exception("Download failed - file not found")
+    raise Exception("Download completed but file not found")
+
+
+def cleanup_old_files(max_age_hours: int = 1):
+    """Remove old files from downloads directory."""
+    import time
+    
+    now = time.time()
+    max_age_seconds = max_age_hours * 3600
+    
+    for filename in os.listdir(DOWNLOADS_DIR):
+        filepath = os.path.join(DOWNLOADS_DIR, filename)
+        try:
+            if os.path.isfile(filepath):
+                file_age = now - os.path.getmtime(filepath)
+                if file_age > max_age_seconds:
+                    os.remove(filepath)
+        except Exception:
+            pass  # Ignore cleanup errors
