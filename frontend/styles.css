@@ -2,638 +2,525 @@
    CSS VARIABLES & THEMES
 ======================================== */
 :root {
-    --bg-primary: #f5f5f7;
-    --bg-card: #ffffff;
-    --bg-input: #f0f0f2;
-    --text-primary: #1d1d1f;
-    --text-secondary: #6e6e73;
-    --text-muted: #86868b;
-    --border-color: #d2d2d7;
-    --accent: #007aff;
-    --accent-hover: #0056b3;
-    --success: #34c759;
-    --error: #ff3b30;
-    --error-bg: #fff5f5;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    --radius: 12px;
-    --radius-sm: 8px;
+  --bg: #0f1724;
+  --card: #1a2332;
+  --input-bg: #0d1219;
+  --text: #f5f5f7;
+  --muted: #9aa4b2;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --success: #10b981;
+  --error: #ef4444;
+  --error-bg: #3b0a0a;
+  --border: rgba(255, 255, 255, 0.08);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  --radius: 12px;
 }
 
-[data-theme="dark"] {
-    --bg-primary: #1c1c1e;
-    --bg-card: #2c2c2e;
-    --bg-input: #3a3a3c;
-    --text-primary: #f5f5f7;
-    --text-secondary: #a1a1a6;
-    --text-muted: #8e8e93;
-    --border-color: #48484a;
-    --error-bg: #3a2a2a;
-    --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+[data-theme="light"] {
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --input-bg: #f0f2f5;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --success: #059669;
+  --error: #dc2626;
+  --error-bg: #fef2f2;
+  --border: rgba(0, 0, 0, 0.08);
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 /* ========================================
    RESET & BASE
 ======================================== */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    min-height: 100vh;
-    line-height: 1.5;
-    transition: background 0.2s, color 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 20px;
+  transition: background 0.2s, color 0.2s;
 }
 
 /* ========================================
    LAYOUT
 ======================================== */
-.container {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: 20px 16px;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+.app {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+header h1 {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.theme-toggle {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.05);
 }
 
 /* ========================================
-   HEADER
-======================================== */
-.header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.header h1 {
-    font-size: 24px;
-    font-weight: 600;
-}
-
-.theme-btn {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    transition: transform 0.2s;
-}
-
-.theme-btn:hover {
-    transform: scale(1.05);
-}
-
-/* ========================================
-   MAIN CARD
+   CARD
 ======================================== */
 .card {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 24px;
-    box-shadow: var(--shadow);
+  background: var(--card);
+  padding: 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 /* ========================================
-   STEP SECTIONS
+   INPUT
 ======================================== */
-.step {
-    margin-bottom: 20px;
+.input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 15px;
+  transition: border-color 0.2s;
 }
 
-.step:last-child {
-    margin-bottom: 0;
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--muted);
 }
 
 /* ========================================
-   INPUT GROUP
+   FORMAT SELECTOR
 ======================================== */
-.input-group {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-.url-input {
-    flex: 1;
-    padding: 14px 16px;
-    font-size: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    background: var(--bg-input);
-    color: var(--text-primary);
-    outline: none;
-    transition: border-color 0.2s;
-}
-
-.url-input:focus {
-    border-color: var(--accent);
-}
-
-.url-input::placeholder {
-    color: var(--text-muted);
-}
-
-.paste-btn {
-    padding: 14px 16px;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 18px;
-    transition: background 0.2s;
-}
-
-.paste-btn:hover {
-    background: var(--border-color);
-}
-
-/* ========================================
-   FORMAT TOGGLE
-======================================== */
-.format-toggle {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
+.format-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .format-btn {
-    flex: 1;
-    padding: 12px;
-    font-size: 15px;
-    font-weight: 500;
-    border: 2px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    background: var(--bg-input);
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.2s;
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .format-btn:hover {
-    border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .format-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* ========================================
    BUTTONS
 ======================================== */
 .btn {
-    width: 100%;
-    padding: 14px 20px;
-    font-size: 16px;
-    font-weight: 600;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.2s;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
-.btn-primary {
-    background: var(--accent);
-    color: white;
+.btn.primary {
+  background: var(--accent);
+  color: #fff;
+  width: 100%;
 }
 
-.btn-primary:hover {
-    background: var(--accent-hover);
+.btn.primary:hover {
+  background: var(--accent-hover);
 }
 
-.btn-secondary {
-    background: var(--bg-input);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    margin-bottom: 10px;
+.btn.outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
 }
 
-.btn-secondary:hover {
-    background: var(--border-color);
+.btn.outline:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.btn-download {
-    background: var(--success);
-    color: white;
+.btn.text {
+  background: transparent;
+  color: var(--muted);
 }
 
-.btn-download:hover {
-    opacity: 0.9;
+.btn.text:hover {
+  color: var(--text);
 }
 
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.download-btn {
+  margin-top: 16px;
+  font-size: 16px;
+  padding: 14px 20px;
 }
 
 /* ========================================
-   LOADER
+   SPINNER
 ======================================== */
-.loader {
-    text-align: center;
-    padding: 30px 0;
-}
-
-.loader p {
-    color: var(--text-secondary);
-    margin-top: 12px;
-}
-
 .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--border-color);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    margin: 0 auto;
-    animation: spin 0.8s linear infinite;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+  margin: 16px auto;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ========================================
-   ERROR BOX
+   QUALITY SELECTOR
 ======================================== */
-.error-box {
-    background: var(--error-bg);
-    border: 1px solid var(--error);
-    border-radius: var(--radius-sm);
-    padding: 16px;
-    margin-top: 16px;
-    text-align: center;
+.quality-selector {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.error-box #errorMessage {
-    color: var(--error);
-    font-weight: 500;
-    margin-bottom: 4px;
+.quality-chip {
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.error-hint {
-    color: var(--text-secondary);
-    font-size: 14px;
+.quality-chip:hover {
+  border-color: var(--accent);
+}
+
+.quality-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 /* ========================================
    VIDEO CARD
 ======================================== */
 .video-card {
-    display: flex;
-    gap: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
 }
 
-.thumbnail {
-    width: 140px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    background: var(--bg-input);
-}
-
-.video-info {
-    flex: 1;
-    min-width: 0;
+.video-card img {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .video-title {
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.3;
-    margin-bottom: 6px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.video-channel {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
-}
-
-.video-duration {
-    font-size: 13px;
-    color: var(--text-muted);
-}
-
-/* ========================================
-   QUALITY CHIPS
-======================================== */
-.section-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    margin-bottom: 10px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
-}
-
-.quality-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.quality-chip {
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: 500;
-    border: 1px solid var(--border-color);
-    border-radius: 20px;
-    background: var(--bg-input);
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quality-chip:hover {
-    border-color: var(--accent);
-}
-
-.quality-chip.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: white;
-}
-
-/* ========================================
-   DOWNLOAD SECTION
-======================================== */
-.step-4 {
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
-}
-
-.folder-status {
-    font-size: 13px;
-    color: var(--success);
-    margin-bottom: 10px;
-    text-align: center;
+.video-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* ========================================
    PROGRESS BAR
 ======================================== */
-.progress-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-color);
+.progress {
+  height: 14px;
+  background: var(--border);
+  border-radius: 10px;
+  margin-top: 16px;
+  position: relative;
+  overflow: hidden;
 }
 
-.progress-bar {
-    height: 8px;
-    background: var(--bg-input);
-    border-radius: 4px;
-    overflow: hidden;
+#progressBar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #60a5fa);
+  border-radius: 10px;
+  transition: width 0.15s ease-out;
 }
 
-.progress-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    transition: width 0.3s;
-}
-
-.progress-text {
-    text-align: center;
-    font-size: 14px;
-    color: var(--text-secondary);
-    margin-top: 8px;
+#progressPercent {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 /* ========================================
-   SUCCESS BOX
+   ERROR & SUCCESS BOXES
 ======================================== */
+.error-box {
+  background: var(--error-bg);
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-top: 12px;
+  border-left: 4px solid var(--error);
+}
+
+.error-message {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 .success-box {
-    background: #e8f8ed;
-    border: 1px solid var(--success);
-    border-radius: var(--radius-sm);
-    padding: 14px;
-    text-align: center;
-    color: var(--success);
-    font-weight: 500;
-    margin-top: 16px;
-}
-
-[data-theme="dark"] .success-box {
-    background: #1a3d2a;
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  padding: 14px;
+  border-radius: 10px;
+  margin-top: 12px;
+  text-align: center;
+  font-weight: 500;
+  border-left: 4px solid var(--success);
 }
 
 /* ========================================
-   RECENT DOWNLOADS
+   HISTORY
 ======================================== */
-.recent-section {
-    margin-top: 24px;
-}
-
 .recent-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 12px;
-    color: var(--text-secondary);
+  margin-top: 24px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
-.recent-list {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    overflow: hidden;
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.recent-item {
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.history-item {
+  background: var(--card);
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text);
+  box-shadow: var(--shadow);
 }
 
-.recent-item:last-child {
-    border-bottom: none;
-}
-
-.recent-item-title {
-    font-size: 14px;
-    font-weight: 500;
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-right: 12px;
-}
-
-.recent-item-time {
-    font-size: 12px;
-    color: var(--text-muted);
-    white-space: nowrap;
-}
-
-.empty-text {
-    padding: 20px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 14px;
+.history-item small {
+  color: var(--muted);
+  display: block;
+  margin-top: 4px;
 }
 
 /* ========================================
    FOOTER
 ======================================== */
 .footer {
-    margin-top: auto;
-    padding-top: 20px;
-    text-align: center;
+  margin-top: 24px;
+  text-align: center;
 }
 
 .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border-radius: 20px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
 }
 
 .status-badge.online {
-    color: var(--success);
+  color: var(--success);
 }
 
 .status-badge.offline {
-    color: var(--error);
+  color: var(--error);
+}
+
+/* ========================================
+   MODAL
+======================================== */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: var(--card);
+  padding: 24px;
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-content h3 {
+  font-size: 20px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.modal-content p {
+  font-size: 14px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-actions .btn {
+  width: 100%;
+}
+
+.modal-note {
+  font-size: 11px !important;
+  color: var(--muted) !important;
+  margin-top: 16px !important;
+  margin-bottom: 0 !important;
+  opacity: 0.7;
 }
 
 /* ========================================
    UTILITIES
 ======================================== */
 .hidden {
-    display: none !important;
-}
-
-/* ========================================
-   DOWNLOAD METHOD MODAL
-======================================== */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 20px;
-    animation: fadeIn 0.2s ease;
-    backdrop-filter: blur(4px);
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal-content {
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    padding: 28px 24px;
-    max-width: 340px;
-    width: 100%;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    position: relative;
-    animation: slideUp 0.2s ease;
-}
-
-@keyframes slideUp {
-    from { 
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to { 
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.modal-title {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 10px;
-    text-align: center;
-}
-
-.modal-text {
-    font-size: 14px;
-    color: var(--text-secondary);
-    text-align: center;
-    margin-bottom: 24px;
-    line-height: 1.5;
-}
-
-.modal-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.modal-buttons .btn {
-    width: 100%;
-    justify-content: center;
-    padding: 14px 20px;
-    font-size: 15px;
-}
-
-.modal-buttons .btn-download {
-    background: var(--accent);
-    color: white;
-}
-
-.modal-buttons .btn-download:hover {
-    background: var(--accent-hover);
+  display: none !important;
 }
 
 /* ========================================
    RESPONSIVE
 ======================================== */
 @media (max-width: 480px) {
-    .container {
-        padding: 16px 12px;
-    }
-    
-    .card {
-        padding: 20px 16px;
-    }
-    
-    .header h1 {
-        font-size: 20px;
-    }
-    
-    .video-card {
-        flex-direction: column;
-    }
-    
-    .thumbnail {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 16/9;
-    }
+  body {
+    padding: 16px;
+  }
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .video-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .video-card img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+  }
+
+  .modal-content {
+    padding: 20px;
+  }
 }

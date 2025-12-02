@@ -1,139 +1,76 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Downloader</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📹</text></svg>">
+  <meta charset="UTF-8" />
+  <title>YouTube Downloader</title>
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📹</text></svg>">
 </head>
 <body>
-
-<div class="container">
-    <!-- Header -->
-    <header class="header">
-        <h1>📹 YouTube Downloader</h1>
-        <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle theme">
-            <span class="theme-icon">🌙</span>
-        </button>
+  <div class="app">
+    <header>
+      <h1>📹 YouTube Downloader</h1>
+      <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
     </header>
 
-    <!-- Main Card -->
-    <main class="card">
-        <!-- Step 1: URL Input -->
-        <section class="step step-1">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="urlInput" 
-                    class="url-input" 
-                    placeholder="Paste YouTube URL here..."
-                    autocomplete="off"
-                >
-                <button class="paste-btn" onclick="pasteFromClipboard()" title="Paste from clipboard">
-                    📋
-                </button>
-            </div>
+    <div class="card">
+      <input id="url" class="input" type="text" placeholder="Paste YouTube URL here" />
 
-            <!-- Format Toggle -->
-            <div class="format-toggle">
-                <button id="btnMp4" class="format-btn active" onclick="setFormat('mp4')">
-                    🎬 MP4
-                </button>
-                <button id="btnMp3" class="format-btn" onclick="setFormat('mp3')">
-                    🎵 MP3
-                </button>
-            </div>
+      <div class="format-selector">
+        <button id="btnMp4" class="format-btn active" onclick="setFormat('mp4')">🎬 MP4</button>
+        <button id="btnMp3" class="format-btn" onclick="setFormat('mp3')">🎵 MP3</button>
+      </div>
 
-            <!-- Fetch Button -->
-            <button id="fetchBtn" class="btn btn-primary" onclick="fetchVideo()">
-                Fetch Video
-            </button>
-        </section>
+      <button class="btn primary" onclick="getInfo()">Fetch Video</button>
 
-        <!-- Loading State -->
-        <div id="loader" class="loader hidden">
-            <div class="spinner"></div>
-            <p>Fetching video info...</p>
-        </div>
+      <div id="loading" class="spinner hidden"></div>
 
-        <!-- Error Box -->
-        <div id="errorBox" class="error-box hidden">
-            <p id="errorMessage"></p>
-            <p id="errorHint" class="error-hint"></p>
-        </div>
+      <div id="errorBox" class="error-box hidden">
+        <p id="errorMessage" class="error-message"></p>
+        <p id="errorHint" class="error-hint"></p>
+      </div>
 
-        <!-- Step 2: Video Preview (shown after fetch) -->
-        <section id="videoPreview" class="step step-2 hidden">
-            <div class="video-card">
-                <img id="thumbnail" class="thumbnail" src="" alt="Video thumbnail">
-                <div class="video-info">
-                    <h2 id="videoTitle" class="video-title"></h2>
-                    <p id="videoChannel" class="video-channel"></p>
-                    <p id="videoDuration" class="video-duration"></p>
-                </div>
-            </div>
-        </section>
+      <div id="info"></div>
 
-        <!-- Step 3: Quality Selection (shown after video loads, MP4 only) -->
-        <section id="qualitySection" class="step step-3 hidden">
-            <p class="section-label">Select Quality:</p>
-            <div id="qualityChips" class="quality-chips"></div>
-        </section>
+      <div id="qualitySelector" class="quality-selector hidden"></div>
 
-        <!-- Step 4: Download Actions -->
-        <section id="downloadSection" class="step step-4 hidden">
-            <button id="downloadBtn" class="btn btn-download" onclick="startDownload()">
-                ⬇️ Download
-            </button>
-        </section>
+      <button id="downloadBtn" class="btn primary download-btn hidden" onclick="onDownloadClick()">
+        ⬇️ Download
+      </button>
 
-        <!-- Progress Bar -->
-        <div id="progressSection" class="progress-section hidden">
-            <div class="progress-bar">
-                <div id="progressFill" class="progress-fill"></div>
-            </div>
-            <p id="progressText" class="progress-text">0%</p>
-        </div>
+      <div id="progressContainer" class="progress hidden">
+        <div id="progressBar"></div>
+        <div id="progressPercent">0%</div>
+      </div>
 
-        <!-- Success Message -->
-        <div id="successBox" class="success-box hidden">
-            ✅ Download complete!
-        </div>
-    </main>
-
-    <!-- Folder Selection Modal -->
-    <div id="folderModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h3 class="modal-title">📁 Save Your Download</h3>
-            <p class="modal-text">Select a folder to save your video file.</p>
-            <div class="modal-buttons">
-                <button id="chooseFolderBtn" class="btn btn-download" onclick="chooseFolderAndDownload()">
-                    📂 Choose Folder
-                </button>
-                <button class="btn btn-secondary" onclick="cancelDownload()">
-                    Cancel
-                </button>
-            </div>
-        </div>
+      <div id="successBox" class="success-box hidden">
+        ✅ Download complete! File saved to selected folder.
+      </div>
     </div>
 
-    <!-- Recent Downloads -->
-    <section class="recent-section">
-        <h3 class="recent-title">Recent Downloads</h3>
-        <div id="recentList" class="recent-list">
-            <p class="empty-text">No downloads yet</p>
-        </div>
-    </section>
+    <h3 class="recent-title">Recent Downloads</h3>
+    <div id="history" class="history"></div>
 
-    <!-- Footer -->
     <footer class="footer">
-        <span id="connectionStatus" class="status-badge offline">
-            ● Checking...
-        </span>
+      <span id="connectionStatus" class="status-badge offline">● Checking...</span>
     </footer>
-</div>
+  </div>
 
-<script src="script.js"></script>
+  <!-- Folder selection modal (shown when user clicks "Download") -->
+  <div id="folderModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
+      <h3 id="folderModalTitle">📁 Save Your Download</h3>
+      <p>Select a folder to save the file, or download normally (browser Save dialog).</p>
+      <div class="modal-actions">
+        <button id="chooseFolderBtn" class="btn primary" onclick="chooseFolderAndStart()">📂 Select Folder & Save</button>
+        <button id="downloadNormallyBtn" class="btn outline" onclick="downloadNormallyFromModal()">⬇️ Download Normally</button>
+        <button id="cancelModalBtn" class="btn text" onclick="closeFolderModal()">Cancel</button>
+      </div>
+      <p class="modal-note">Note: Folder selection only works in Chrome/Edge. Other browsers will use Save dialog.</p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
