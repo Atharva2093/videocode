@@ -1,8 +1,16 @@
 /* ========================================
-   YOUTUBE DOWNLOADER - FRONTEND SCRIPT
-   Enforces folder selection before download
-   Works only in Chrome/Edge (File System Access API)
+   YOUTUBE DOWNLOADER - STRICT FOLDER MODE
+   ========================================
+   ENFORCES:
+   - File System Access API only (Chrome/Edge)
+   - NO fallback auto-downloads
+   - NO anchor-based downloads
+   - NO window.location redirects
+   - Folder picker EVERY time
+   - Streaming write to selected folder
 ======================================== */
+
+"use strict";
 
 // ========================================
 // API DETECTION (local / prod)
@@ -21,7 +29,6 @@ let selectedQuality = "720p";
 let selectedFormatId = null;
 let currentVideoUrl = "";
 let currentTitle = "";
-let currentFilename = "";
 
 // ========================================
 // DOM ELEMENTS
@@ -43,6 +50,13 @@ const historyDiv = document.getElementById("history");
 const connectionStatus = document.getElementById("connectionStatus");
 
 // ========================================
+// BROWSER SUPPORT CHECK
+// ========================================
+function isFolderPickerSupported() {
+  return typeof window.showDirectoryPicker === "function";
+}
+
+// ========================================
 // THEME TOGGLE
 // ========================================
 function toggleTheme() {
@@ -51,12 +65,12 @@ function toggleTheme() {
   html.dataset.theme = newTheme;
   
   const btn = document.querySelector(".theme-toggle");
-  btn.textContent = newTheme === "dark" ? "🌙" : "☀️";
+  if (btn) btn.textContent = newTheme === "dark" ? "🌙" : "☀️";
   
   localStorage.setItem("theme", newTheme);
 }
 
-// Load saved theme
+// Load saved theme on page load
 (function loadTheme() {
   const saved = localStorage.getItem("theme");
   if (saved) {
@@ -74,6 +88,7 @@ function showError(msg, hint = "") {
   errorMessage.textContent = msg;
   if (errorHint) errorHint.textContent = hint;
   successBox.classList.add("hidden");
+  progressContainer.classList.add("hidden");
 }
 
 function hideError() {
@@ -84,7 +99,7 @@ function hideError() {
 
 function showSuccess() {
   successBox.classList.remove("hidden");
-  setTimeout(() => successBox.classList.add("hidden"), 4000);
+  setTimeout(() => successBox.classList.add("hidden"), 5000);
 }
 
 function hideSuccess() {
@@ -92,7 +107,7 @@ function hideSuccess() {
 }
 
 // ========================================
-// FORMAT TOGGLE
+// FORMAT TOGGLE (MP4 / MP3)
 // ========================================
 function setFormat(f) {
   selectedFormat = f;
@@ -162,7 +177,7 @@ async function getInfo() {
   } catch (err) {
     loading.classList.add("hidden");
     showError("Could not connect to server.", "Check if backend is running.");
-    console.error(err);
+    console.error("Metadata fetch error:", err);
   }
 }
 
@@ -230,13 +245,22 @@ function onSelectQuality(el) {
 }
 
 // ========================================
-// DOWNLOAD BUTTON CLICKED -> SHOW MODAL
+// DOWNLOAD BUTTON -> CHECK SUPPORT & SHOW MODAL
 // ========================================
 function onDownloadClick() {
   hideError();
   hideSuccess();
   
-  // Always show modal to choose download method
+  // STRICT: Check browser support FIRST
+  if (!isFolderPickerSupported()) {
+    showError(
+      "Your browser does not support folder saving.",
+      "Please use Google Chrome or Microsoft Edge to download videos."
+    );
+    return; // DO NOT proceed, NO fallback
+  }
+  
+  // Show folder selection modal
   folderModal.classList.remove("hidden");
   folderModal.setAttribute("aria-hidden", "false");
 }
@@ -249,51 +273,33 @@ function closeFolderModal() {
   folderModal.setAttribute("aria-hidden", "true");
 }
 
-// "Download Normally" - Opens browser Save dialog
-function downloadNormallyFromModal() {
-  closeFolderModal();
-  
-  const formatId = getSelectedFormatId();
-  const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
-  
-  // Create temporary anchor - browser will show Save dialog
-  const a = document.createElement("a");
-  a.href = downloadUrl;
-  a.download = sanitizeFilename(currentTitle) + (selectedFormat === "mp3" ? ".mp3" : ".mp4");
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  
-  // Record history
-  saveToHistory(currentTitle);
-  showSuccess();
-}
-
-// "Select Folder & Save" - Use File System Access API
+// ========================================
+// FOLDER SELECTION & STREAMING DOWNLOAD
+// ========================================
 async function chooseFolderAndStart() {
   closeFolderModal();
   
-  // Check browser support
-  if (!window.showDirectoryPicker) {
+  // Double-check support (defensive)
+  if (!isFolderPickerSupported()) {
     showError(
-      "Folder selection not supported in this browser.",
-      "Use Chrome or Edge, or click 'Download Normally'."
+      "Your browser does not support folder saving.",
+      "Please use Google Chrome or Microsoft Edge."
     );
     return;
   }
   
+  // ALWAYS prompt for folder - never reuse old permissions
   let folder;
   try {
-    // FORCE folder selection every time (no caching)
-    folder = await window.showDirectoryPicker();
+    folder = await window.showDirectoryPicker({ mode: "readwrite" });
   } catch (err) {
-    console.log("Folder selection cancelled:", err);
-    // User cancelled - do nothing
-    return;
+    // User cancelled the picker
+    console.log("Folder selection cancelled:", err.name, err.message);
+    return; // Do nothing, no fallback
   }
   
-  // Start streaming download to selected folder
-  await downloadToFolder(folder);
+  // Folder selected - start streaming download
+  await streamDownloadToFolder(folder);
 }
 
 // ========================================
@@ -303,7 +309,7 @@ function getSelectedFormatId() {
   if (selectedFormat === "mp3") return "mp3";
   if (selectedFormatId) return selectedFormatId;
   
-  // Fallback
+  // Fallback: check active chip
   const activeChip = document.querySelector(".quality-chip.active");
   if (activeChip?.dataset.formatId) return activeChip.dataset.formatId;
   
@@ -311,120 +317,190 @@ function getSelectedFormatId() {
 }
 
 // ========================================
-// STREAM DOWNLOAD TO FOLDER
+// STREAM DOWNLOAD TO FOLDER (CORE LOGIC)
 // ========================================
-async function downloadToFolder(folder) {
+async function streamDownloadToFolder(folder) {
   hideError();
   hideSuccess();
+  
+  // Show progress
   progressContainer.classList.remove("hidden");
   progressBar.style.width = "0%";
-  progressPercent.textContent = "0%";
+  progressPercent.textContent = "Starting...";
   
   const formatId = getSelectedFormatId();
   const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
   
+  let response;
   try {
-    const response = await fetch(downloadUrl);
-    
-    // Check for error response
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => null);
-      progressContainer.classList.add("hidden");
-      showError(errJson?.message || `Download failed: ${response.status}`, errJson?.hint || "");
-      return;
-    }
-    
-    // Get filename from Content-Disposition header or use fallback
-    let filename = getFilenameFromResponse(response);
-    if (!filename) {
-      const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
-      filename = sanitizeFilename(currentTitle) + ext;
-    }
-    currentFilename = filename;
-    
-    // Get content length for progress calculation
-    const contentLength = parseInt(response.headers.get("Content-Length") || "0", 10);
-    
-    // Create file in selected folder
-    const fileHandle = await folder.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    
-    // Stream response body and write chunks
-    const reader = response.body.getReader();
-    let receivedBytes = 0;
-    
+    response = await fetch(downloadUrl);
+  } catch (networkErr) {
+    progressContainer.classList.add("hidden");
+    showError("Network error: Could not reach server.", "Check your internet connection.");
+    console.error("Fetch error:", networkErr);
+    return;
+  }
+  
+  // Check if response is an error (JSON)
+  const contentType = response.headers.get("Content-Type") || "";
+  if (contentType.includes("application/json")) {
+    const errData = await response.json().catch(() => ({}));
+    progressContainer.classList.add("hidden");
+    showError(errData.message || "Download failed.", errData.hint || "");
+    return;
+  }
+  
+  // Check HTTP status
+  if (!response.ok) {
+    progressContainer.classList.add("hidden");
+    showError(`Server error: ${response.status} ${response.statusText}`, "Try again later.");
+    return;
+  }
+  
+  // Extract filename from Content-Disposition header
+  let filename = getFilenameFromContentDisposition(response.headers.get("Content-Disposition"));
+  if (!filename) {
+    // Fallback: sanitize title
+    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
+    filename = sanitizeFilename(currentTitle) + ext;
+  }
+  
+  // Get Content-Length for progress calculation
+  const contentLength = parseInt(response.headers.get("Content-Length") || "0", 10);
+  
+  // Create file handle in selected folder
+  let fileHandle;
+  try {
+    fileHandle = await folder.getFileHandle(filename, { create: true });
+  } catch (err) {
+    progressContainer.classList.add("hidden");
+    showError("Could not create file in selected folder.", "Check folder permissions and try again.");
+    console.error("getFileHandle error:", err);
+    return;
+  }
+  
+  // Open writable stream
+  let writable;
+  try {
+    writable = await fileHandle.createWritable();
+  } catch (err) {
+    progressContainer.classList.add("hidden");
+    showError("Could not open file for writing.", "Check folder permissions.");
+    console.error("createWritable error:", err);
+    return;
+  }
+  
+  // Get response body reader for streaming
+  const reader = response.body.getReader();
+  let receivedBytes = 0;
+  
+  try {
     while (true) {
       const { value, done } = await reader.read();
-      if (done) break;
+      
+      if (done) {
+        break;
+      }
       
       // Write chunk to file
       await writable.write(value);
       receivedBytes += value.length;
       
-      // Update progress
+      // Update progress bar
       if (contentLength > 0) {
         const percent = Math.min(100, Math.round((receivedBytes / contentLength) * 100));
         progressBar.style.width = percent + "%";
         progressPercent.textContent = percent + "%";
       } else {
-        // Approximate progress when Content-Length not available
-        const approxPercent = Math.min(95, Math.round(receivedBytes / 1000000) * 5);
-        progressBar.style.width = approxPercent + "%";
-        progressPercent.textContent = approxPercent + "%";
+        // No Content-Length: show bytes downloaded
+        const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
+        progressBar.style.width = "50%"; // Indeterminate
+        progressPercent.textContent = `${mb} MB`;
       }
     }
     
-    // Finalize file
+    // Close the writable stream to finalize the file
     await writable.close();
     
     // Success!
     progressBar.style.width = "100%";
     progressPercent.textContent = "100%";
     
-    saveToHistory(currentTitle + " → " + filename);
+    // Save to history
+    saveToHistory(currentTitle, filename);
     showSuccess();
     
-    // Hide progress after a moment
+    // Hide progress bar after delay
     setTimeout(() => {
       progressContainer.classList.add("hidden");
       progressBar.style.width = "0%";
       progressPercent.textContent = "0%";
-    }, 1500);
+    }, 2000);
     
-  } catch (err) {
-    console.error("Download error:", err);
+  } catch (streamErr) {
+    console.error("Streaming error:", streamErr);
+    
+    // Attempt to close writable on error
+    try {
+      await writable.abort();
+    } catch (abortErr) {
+      console.error("Abort error:", abortErr);
+    }
+    
     progressContainer.classList.add("hidden");
-    showError("Download failed during streaming.", "Check folder permission and try again.");
+    showError("Download failed during file write.", "Check disk space and folder permissions.");
   }
 }
 
 // ========================================
-// HELPER FUNCTIONS
+// EXTRACT FILENAME FROM CONTENT-DISPOSITION
 // ========================================
-function sanitizeFilename(name) {
-  return (name || "video")
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .substring(0, 100);
-}
-
-function getFilenameFromResponse(response) {
-  const cd = response.headers.get("Content-Disposition");
-  if (!cd) return null;
+function getFilenameFromContentDisposition(header) {
+  if (!header) return null;
   
-  // Try filename*= (RFC 5987)
-  let match = /filename\*=(?:UTF-8'')?["']?([^"';\n]+)["']?/i.exec(cd);
-  if (match?.[1]) return decodeURIComponent(match[1]);
+  // Try filename*= (RFC 5987 encoded)
+  let match = /filename\*\s*=\s*(?:UTF-8''|utf-8'')([^;\r\n]+)/i.exec(header);
+  if (match && match[1]) {
+    try {
+      return decodeURIComponent(match[1].replace(/['"]/g, "").trim());
+    } catch (e) {
+      console.warn("Failed to decode filename*:", e);
+    }
+  }
   
-  // Try filename=
-  match = /filename=["']?([^"';\n]+)["']?/i.exec(cd);
-  if (match?.[1]) return match[1].trim();
+  // Try filename= (quoted)
+  match = /filename\s*=\s*"([^"]+)"/i.exec(header);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  
+  // Try filename= (unquoted)
+  match = /filename\s*=\s*([^;\r\n]+)/i.exec(header);
+  if (match && match[1]) {
+    return match[1].replace(/['"]/g, "").trim();
+  }
   
   return null;
 }
 
+// ========================================
+// SANITIZE FILENAME
+// ========================================
+function sanitizeFilename(name) {
+  if (!name) return "video";
+  
+  return name
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "") // Remove illegal chars
+    .replace(/\s+/g, " ")                   // Collapse whitespace
+    .trim()
+    .substring(0, 120);                     // Limit length
+}
+
+// ========================================
+// ESCAPE HTML
+// ========================================
 function escapeHtml(text) {
+  if (!text) return "";
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
@@ -433,17 +509,19 @@ function escapeHtml(text) {
 // ========================================
 // HISTORY (localStorage)
 // ========================================
-function saveToHistory(name) {
+function saveToHistory(title, filename) {
   const history = JSON.parse(localStorage.getItem("downloadHistory") || "[]");
   
   history.unshift({
-    name: name.substring(0, 80),
-    time: new Date().toLocaleString(),
-    file: currentFilename || ""
+    name: (title || "Unknown").substring(0, 80),
+    file: filename || "",
+    time: new Date().toLocaleString()
   });
   
-  // Keep only last 8 items
-  if (history.length > 8) history.pop();
+  // Keep only last 10 items
+  while (history.length > 10) {
+    history.pop();
+  }
   
   localStorage.setItem("downloadHistory", JSON.stringify(history));
   renderHistory();
@@ -459,21 +537,21 @@ function renderHistory() {
   
   historyDiv.innerHTML = arr.map(h => `
     <div class="history-item">
-      ${escapeHtml(h.name)}
-      <small>${h.time}${h.file ? " • " + escapeHtml(h.file) : ""}</small>
+      <strong>${escapeHtml(h.name)}</strong>
+      <small>${h.file ? escapeHtml(h.file) + " • " : ""}${h.time}</small>
     </div>
   `).join("");
 }
 
-// Initial render
+// Render history on load
 renderHistory();
 
 // ========================================
-// CONNECTION STATUS
+// CONNECTION STATUS CHECK
 // ========================================
 async function checkConnection() {
   try {
-    const res = await fetch(`${API}/health`);
+    const res = await fetch(`${API}/health`, { method: "GET" });
     const data = await res.json();
     
     if (data.status === "ok") {
@@ -483,14 +561,14 @@ async function checkConnection() {
     } else {
       throw new Error("Not ok");
     }
-  } catch {
+  } catch (err) {
     connectionStatus.textContent = "● Offline";
     connectionStatus.classList.remove("online");
     connectionStatus.classList.add("offline");
   }
 }
 
-// Check connection on load and every 30 seconds
+// Check connection on load and periodically
 checkConnection();
 setInterval(checkConnection, 30000);
 
@@ -501,13 +579,22 @@ urlInput.addEventListener("keypress", (e) => {
   if (e.key === "Enter") getInfo();
 });
 
-// Close modal on overlay click
+// Close modal when clicking outside
 folderModal.addEventListener("click", (e) => {
-  if (e.target === folderModal) closeFolderModal();
+  if (e.target === folderModal) {
+    closeFolderModal();
+  }
+});
+
+// Escape key closes modal
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !folderModal.classList.contains("hidden")) {
+    closeFolderModal();
+  }
 });
 
 // ========================================
-// EXPOSE FUNCTIONS TO HTML
+// EXPOSE FUNCTIONS TO HTML onclick
 // ========================================
 window.toggleTheme = toggleTheme;
 window.setFormat = setFormat;
@@ -515,5 +602,14 @@ window.getInfo = getInfo;
 window.onSelectQuality = onSelectQuality;
 window.onDownloadClick = onDownloadClick;
 window.chooseFolderAndStart = chooseFolderAndStart;
-window.downloadNormallyFromModal = downloadNormallyFromModal;
 window.closeFolderModal = closeFolderModal;
+
+// ========================================
+// REMOVED FUNCTIONS (for clarity)
+// ========================================
+// The following have been intentionally removed:
+// - downloadNormallyFromModal() - NO fallback downloads
+// - Any code using window.location.href
+// - Any code using <a download> anchors
+// - Any code using a.click()
+// - Any localStorage caching of folder permissions

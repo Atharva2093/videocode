@@ -60,14 +60,13 @@
   <!-- Folder selection modal (shown when user clicks "Download") -->
   <div id="folderModal" class="modal hidden" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
-      <h3 id="folderModalTitle">📁 Save Your Download</h3>
-      <p>Select a folder to save the file, or download normally (browser Save dialog).</p>
+      <h3 id="folderModalTitle">📁 Choose Save Location</h3>
+      <p>Select the folder where you want to save this video.</p>
       <div class="modal-actions">
         <button id="chooseFolderBtn" class="btn primary" onclick="chooseFolderAndStart()">📂 Select Folder & Save</button>
-        <button id="downloadNormallyBtn" class="btn outline" onclick="downloadNormallyFromModal()">⬇️ Download Normally</button>
         <button id="cancelModalBtn" class="btn text" onclick="closeFolderModal()">Cancel</button>
       </div>
-      <p class="modal-note">Note: Folder selection only works in Chrome/Edge. Other browsers will use Save dialog.</p>
+      <p class="modal-note">⚠️ Requires Chrome or Edge. Firefox/Safari are not supported.</p>
     </div>
   </div>
 
