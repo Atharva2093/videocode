@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from simple_downloader import download_video, get_ydl_opts, COOKIES_FILE
+from simple_downloader import download_video, get_ydl_opts, get_ffmpeg_location, COOKIES_FILE
 from exceptions import (
     BaseAPIError, InvalidURLError, MetadataError, DownloadError,
     DRMError, LiveStreamError, classify_ytdlp_error
@@ -10,6 +10,7 @@ import yt_dlp
 import os
 import re
 import subprocess
+import shutil
 
 app = FastAPI()
 
@@ -73,9 +74,33 @@ def validate_youtube_url(url: str) -> bool:
 @app.get("/api/health")
 def health():
     cookies_loaded = os.path.exists(COOKIES_FILE)
+    
+    # Check FFmpeg availability
+    ffmpeg_location = get_ffmpeg_location()
+    ffmpeg_available = ffmpeg_location is not None
+    
+    # Try to get FFmpeg version
+    ffmpeg_version = None
+    if ffmpeg_available:
+        try:
+            result = subprocess.run(
+                ["ffmpeg", "-version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                # Extract first line of version info
+                ffmpeg_version = result.stdout.split('\n')[0]
+        except Exception:
+            pass
+    
     return {
         "status": "ok",
-        "cookies_loaded": cookies_loaded
+        "cookies_loaded": cookies_loaded,
+        "ffmpeg_available": ffmpeg_available,
+        "ffmpeg_location": ffmpeg_location,
+        "ffmpeg_version": ffmpeg_version
     }
 
 
