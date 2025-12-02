@@ -537,13 +537,14 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
     animation: fadeIn 0.2s ease;
+    backdrop-filter: blur(4px);
 }
 
 @keyframes fadeIn {
@@ -554,10 +555,10 @@ body {
 .modal-content {
     background: var(--bg-card);
     border-radius: var(--radius);
-    padding: 24px;
-    max-width: 360px;
+    padding: 28px 24px;
+    max-width: 340px;
     width: 100%;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
     position: relative;
     animation: slideUp 0.2s ease;
 }
@@ -574,9 +575,9 @@ body {
 }
 
 .modal-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     text-align: center;
 }
 
@@ -584,40 +585,30 @@ body {
     font-size: 14px;
     color: var(--text-secondary);
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    line-height: 1.5;
 }
 
 .modal-buttons {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
 .modal-buttons .btn {
     width: 100%;
     justify-content: center;
+    padding: 14px 20px;
+    font-size: 15px;
 }
 
-.modal-close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    color: var(--text-muted);
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
+.modal-buttons .btn-download {
+    background: var(--accent);
+    color: white;
 }
 
-.modal-close:hover {
-    background: var(--bg-input);
+.modal-buttons .btn-download:hover {
+    background: var(--accent-hover);
 }
 
 /* ========================================

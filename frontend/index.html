@@ -102,20 +102,19 @@
         </div>
     </main>
 
-    <!-- Download Method Modal -->
-    <div id="downloadModal" class="modal-overlay hidden">
+    <!-- Folder Selection Modal -->
+    <div id="folderModal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h3 class="modal-title">Choose Download Method</h3>
-            <p class="modal-text">Where would you like to save the file?</p>
+            <h3 class="modal-title">📁 Save Your Download</h3>
+            <p class="modal-text">Select a folder to save your video file.</p>
             <div class="modal-buttons">
-                <button id="modalFolderBtn" class="btn btn-secondary" onclick="handleFolderDownload()">
-                    📁 Select Folder
+                <button id="chooseFolderBtn" class="btn btn-download" onclick="chooseFolderAndDownload()">
+                    📂 Choose Folder
                 </button>
-                <button id="modalNormalBtn" class="btn btn-primary" onclick="handleNormalDownload()">
-                    ⬇️ Download Normally
+                <button class="btn btn-secondary" onclick="cancelDownload()">
+                    Cancel
                 </button>
             </div>
-            <button class="modal-close" onclick="hideDownloadModal()">✕</button>
         </div>
     </div>
 

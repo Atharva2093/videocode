@@ -19,7 +19,6 @@ let selectedFormatId = null;  // The actual format_id to send to backend
 let currentVideoData = null;
 let currentVideoUrl = "";
 let qualityToFormatMap = {};  // Maps height -> best format_id for that height
-let pendingDownloadFolder = null;  // Folder selected in modal
 
 // ========================================
 // DOM ELEMENTS
@@ -45,7 +44,7 @@ const progressText = document.getElementById("progressText");
 const successBox = document.getElementById("successBox");
 const recentList = document.getElementById("recentList");
 const connectionStatus = document.getElementById("connectionStatus");
-const downloadModal = document.getElementById("downloadModal");
+const folderModal = document.getElementById("folderModal");
 
 // ========================================
 // INITIALIZATION
@@ -54,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
     checkConnection();
     renderRecentDownloads();
     setupEventListeners();
+    checkBrowserSupport();
 });
 
 function setupEventListeners() {
@@ -69,10 +69,17 @@ function setupEventListeners() {
     });
     
     // Close modal on overlay click
-    if (downloadModal) {
-        downloadModal.addEventListener("click", (e) => {
-            if (e.target === downloadModal) hideDownloadModal();
+    if (folderModal) {
+        folderModal.addEventListener("click", (e) => {
+            if (e.target === folderModal) cancelDownload();
         });
+    }
+}
+
+function checkBrowserSupport() {
+    // Check if File System Access API is supported
+    if (!window.showDirectoryPicker) {
+        console.warn("File System Access API not supported. Downloads may not work as expected.");
     }
 }
 
@@ -334,56 +341,23 @@ function displayVideoInfo(data) {
 }
 
 // ========================================
-// FOLDER PICKER
+// FOLDER MODAL
 // ========================================
-async function selectFolder() {
+function showFolderModal() {
     if (!window.showDirectoryPicker) {
-        return null;
-    }
-    
-    try {
-        return await window.showDirectoryPicker();
-    } catch (err) {
-        // User cancelled
-        return null;
-    }
-}
-
-// ========================================
-// DOWNLOAD MODAL
-// ========================================
-function showDownloadModal() {
-    // Only show folder option if browser supports it
-    const folderBtn = document.getElementById("modalFolderBtn");
-    if (folderBtn) {
-        folderBtn.style.display = window.showDirectoryPicker ? "flex" : "none";
-    }
-    downloadModal.classList.remove("hidden");
-}
-
-function hideDownloadModal() {
-    downloadModal.classList.add("hidden");
-}
-
-// Called when user clicks "Select Folder" in modal
-async function handleFolderDownload() {
-    hideDownloadModal();
-    
-    const folder = await selectFolder();
-    if (!folder) {
-        // User cancelled folder picker, do nothing
+        showError("Your browser doesn't support folder selection", "Please use Chrome or Edge");
         return;
     }
-    
-    pendingDownloadFolder = folder;
-    executeDownload(true);
+    folderModal.classList.remove("hidden");
 }
 
-// Called when user clicks "Download Normally" in modal
-function handleNormalDownload() {
-    hideDownloadModal();
-    pendingDownloadFolder = null;
-    executeDownload(false);
+function hideFolderModal() {
+    folderModal.classList.add("hidden");
+}
+
+function cancelDownload() {
+    hideFolderModal();
+    // Do nothing else - download is cancelled
 }
 
 // ========================================
@@ -395,14 +369,44 @@ function startDownload() {
     hideError();
     hideSuccess();
     
-    // Show modal to choose download method
-    showDownloadModal();
+    // ALWAYS show folder selection modal first - never auto-download
+    showFolderModal();
 }
 
 // ========================================
-// DOWNLOAD - Execute
+// CHOOSE FOLDER AND START DOWNLOAD
 // ========================================
-async function executeDownload(useFolder) {
+async function chooseFolderAndDownload() {
+    hideFolderModal();
+    
+    // Check browser support
+    if (!window.showDirectoryPicker) {
+        showError("Your browser doesn't support folder selection", "Please use Chrome or Edge");
+        return;
+    }
+    
+    // FORCE folder selection every time - no caching
+    let folder;
+    try {
+        folder = await window.showDirectoryPicker();
+    } catch (err) {
+        // User cancelled folder picker
+        console.log("Folder selection cancelled");
+        return; // Do nothing, no download
+    }
+    
+    if (!folder) {
+        return; // No folder selected, cancel download
+    }
+    
+    // Now start the actual download to the selected folder
+    await executeDownloadToFolder(folder);
+}
+
+// ========================================
+// EXECUTE DOWNLOAD TO FOLDER (Streaming)
+// ========================================
+async function executeDownloadToFolder(folder) {
     showProgress();
     updateProgress(0);
     
@@ -413,95 +417,58 @@ async function executeDownload(useFolder) {
     
     const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
     
-    // Generate filename early
+    // Generate filename
     const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
-    const safeName = (currentVideoData?.title || "video").replace(/[^a-zA-Z0-9\s]/g, "").trim().substring(0, 50) || "video";
+    const safeName = (currentVideoData?.title || "video")
+        .replace(/[^a-zA-Z0-9\s\-_]/g, "")
+        .trim()
+        .substring(0, 80) || "video";
     const fallbackFileName = safeName + ext;
     
     try {
-        if (useFolder && pendingDownloadFolder) {
-            // Streaming download to folder
-            await downloadToFolderStreaming(downloadUrl, fallbackFileName);
-        } else {
-            // Normal browser download - instant, no waiting
-            triggerBrowserDownload(downloadUrl, fallbackFileName);
-        }
-    } catch (err) {
-        console.error("Download error:", err);
-        hideProgress();
+        // Fetch the video stream from backend
+        const response = await fetch(downloadUrl);
         
-        // If folder download failed, offer fallback
-        if (useFolder) {
-            showError("Folder save failed. Try 'Download Normally' instead.", "");
-        } else {
-            showError("Download failed", err.message || "Please try again");
+        // Check for error response (JSON)
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            const data = await response.json();
+            hideProgress();
+            showError(data.message || data.error || "Download failed", data.hint || "");
+            return;
         }
-    }
-}
-
-// ========================================
-// INSTANT BROWSER DOWNLOAD
-// ========================================
-function triggerBrowserDownload(url, fallbackName) {
-    // Create invisible link and click it - instant download start
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fallbackName;
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    // Show success after a short delay (download has started)
-    updateProgress(100);
-    setTimeout(() => {
-        hideProgress();
-        showSuccess();
-        saveToHistory(currentVideoData?.title || currentVideoUrl);
-    }, 500);
-}
-
-// ========================================
-// STREAMING DOWNLOAD TO FOLDER
-// ========================================
-async function downloadToFolderStreaming(url, fallbackFileName) {
-    const response = await fetch(url);
-    
-    // Check for error response (JSON)
-    const contentType = response.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-        const data = await response.json();
-        hideProgress();
-        showError(data.message || data.error || "Download failed", data.hint || "");
-        return;
-    }
-    
-    if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-    }
-    
-    // Get filename from header or use fallback
-    const fileName = getFileNameFromResponse(response) || fallbackFileName;
-    
-    // Get content length for progress
-    const contentLength = response.headers.get("content-length");
-    const totalSize = contentLength ? parseInt(contentLength) : null;
-    
-    try {
+        
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+        
+        // Get filename from header or use fallback
+        const fileName = getFileNameFromResponse(response) || fallbackFileName;
+        
+        // Get content length for progress tracking
+        const contentLength = response.headers.get("content-length");
+        const totalSize = contentLength ? parseInt(contentLength) : null;
+        
         // Verify folder permission
-        const permission = await pendingDownloadFolder.queryPermission({ mode: "readwrite" });
-        if (permission !== "granted") {
-            const result = await pendingDownloadFolder.requestPermission({ mode: "readwrite" });
-            if (result !== "granted") {
-                throw new Error("Folder permission denied");
+        try {
+            const permission = await folder.queryPermission({ mode: "readwrite" });
+            if (permission !== "granted") {
+                const result = await folder.requestPermission({ mode: "readwrite" });
+                if (result !== "granted") {
+                    throw new Error("Folder permission denied");
+                }
             }
+        } catch (permErr) {
+            hideProgress();
+            showError("Folder access denied", "Please grant permission to save files");
+            return;
         }
         
-        // Create file and get writable stream
-        const fileHandle = await pendingDownloadFolder.getFileHandle(fileName, { create: true });
+        // Create file in the selected folder
+        const fileHandle = await folder.getFileHandle(fileName, { create: true });
         const writable = await fileHandle.createWritable();
         
-        // Stream the response
+        // Stream the response chunk by chunk
         const reader = response.body.getReader();
         let receivedBytes = 0;
         
@@ -509,22 +476,25 @@ async function downloadToFolderStreaming(url, fallbackFileName) {
             const { done, value } = await reader.read();
             if (done) break;
             
+            // Write chunk to file
             await writable.write(value);
             receivedBytes += value.length;
             
-            // Update progress
+            // Update progress bar
             if (totalSize) {
                 const percent = (receivedBytes / totalSize) * 100;
                 updateProgress(Math.min(percent, 99));
             } else {
-                // Estimate progress without content-length
-                updateProgress(Math.min(50 + (receivedBytes / 10000000) * 40, 95));
+                // Estimate progress when content-length not available
+                const estimatedPercent = Math.min(50 + (receivedBytes / 50000000) * 45, 95);
+                updateProgress(estimatedPercent);
             }
         }
         
+        // Close the file - this finalizes the write
         await writable.close();
         
-        // Success
+        // Success!
         updateProgress(100);
         setTimeout(() => {
             hideProgress();
@@ -533,11 +503,15 @@ async function downloadToFolderStreaming(url, fallbackFileName) {
         }, 300);
         
     } catch (err) {
-        console.error("Folder streaming error:", err);
-        throw err;
+        console.error("Download error:", err);
+        hideProgress();
+        showError("Download failed", err.message || "Please try again");
     }
 }
 
+// ========================================
+// HELPER: Get filename from response header
+// ========================================
 function getFileNameFromResponse(response) {
     const contentDisposition = response.headers.get("content-disposition");
     if (contentDisposition) {
@@ -608,7 +582,7 @@ function resetUI() {
     hideError();
     hideSuccess();
     hideProgress();
-    hideDownloadModal();
+    hideFolderModal();
     videoPreview.classList.add("hidden");
     qualitySection.classList.add("hidden");
     downloadSection.classList.add("hidden");
@@ -616,7 +590,6 @@ function resetUI() {
     qualityToFormatMap = {};
     selectedQuality = null;
     selectedFormatId = null;
-    pendingDownloadFolder = null;
 }
 
 // ========================================
