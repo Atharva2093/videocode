@@ -1,7 +1,4 @@
-# Custom Exceptions for YouTube Downloader API
-
 class BaseAPIError(Exception):
-    """Base exception for all API errors"""
     status_code: int = 500
     error: str = "INTERNAL_ERROR"
     message: str = "An unexpected error occurred."
@@ -39,14 +36,14 @@ class DownloadError(BaseAPIError):
 class DRMError(BaseAPIError):
     status_code = 403
     error = "DRM_PROTECTED"
-    message = "This video is protected by DRM and cannot be downloaded."
-    hint = "Try downloading a non-DRM normal YouTube video."
+    message = "This video is protected and cannot be downloaded."
+    hint = "Try a different video."
 
 
 class PrivateVideoError(BaseAPIError):
     status_code = 403
     error = "PRIVATE_VIDEO"
-    message = "This video is private and cannot be downloaded."
+    message = "This video is private."
     hint = "Only the owner can access this video."
 
 
@@ -54,100 +51,55 @@ class AgeRestrictedError(BaseAPIError):
     status_code = 403
     error = "AGE_RESTRICTED"
     message = "This video is age-restricted."
-    hint = "You must sign in on YouTube to view this content."
-
-
-class UnavailableQualityError(BaseAPIError):
-    status_code = 400
-    error = "QUALITY_UNAVAILABLE"
-    message = "The selected quality is not available for this video."
-    hint = "Try 720p or a lower resolution."
-
-
-class ExtractionError(BaseAPIError):
-    status_code = 500
-    error = "EXTRACTION_ERROR"
-    message = "Failed to extract video data from YouTube."
-    hint = "YouTube may have changed its format. Try again later."
-
-
-class YTDLPError(BaseAPIError):
-    status_code = 500
-    error = "YTDLP_OUTDATED"
-    message = "YouTube encryption changed recently."
-    hint = "Update yt-dlp to the latest version: pip install -U yt-dlp"
-
-
-class NetworkError(BaseAPIError):
-    status_code = 503
-    error = "NETWORK_ERROR"
-    message = "Could not reach YouTube."
-    hint = "Check your internet connection and try again."
+    hint = "Sign in on YouTube to view this content."
 
 
 class LiveStreamError(BaseAPIError):
     status_code = 400
     error = "LIVE_STREAM"
     message = "Live streams cannot be downloaded."
-    hint = "Wait until the stream ends and try again."
+    hint = "Wait until the stream ends."
 
 
 class GeoBlockedError(BaseAPIError):
     status_code = 403
     error = "GEO_BLOCKED"
     message = "This video is not available in your region."
-    hint = "Try using a VPN or find another video."
+    hint = "Try using a VPN."
+
+
+class NetworkError(BaseAPIError):
+    status_code = 503
+    error = "NETWORK_ERROR"
+    message = "Could not reach YouTube."
+    hint = "Check your internet connection."
+
+
+class ExtractionError(BaseAPIError):
+    status_code = 500
+    error = "EXTRACTION_ERROR"
+    message = "Failed to extract video data."
+    hint = "YouTube may have changed. Try again later."
 
 
 def classify_ytdlp_error(error_str: str) -> BaseAPIError:
-    """
-    Analyze yt-dlp error message and return the appropriate exception.
-    """
-    error_lower = error_str.lower()
+    e = error_str.lower()
     
-    # DRM / Protected content
-    if any(kw in error_lower for kw in ["drm", "protected", "widevine", "playready"]):
+    if any(k in e for k in ["drm", "protected", "widevine"]):
         return DRMError()
-    
-    # Private video
-    if any(kw in error_lower for kw in ["private video", "video is private", "this video is private"]):
+    if any(k in e for k in ["private video", "video is private"]):
         return PrivateVideoError()
-    
-    # Age restricted
-    if any(kw in error_lower for kw in ["age", "sign in to confirm", "confirm your age", "age-restricted"]):
+    if any(k in e for k in ["age", "sign in to confirm", "age-restricted"]):
         return AgeRestrictedError()
-    
-    # nsig / signature extraction (yt-dlp needs update)
-    if any(kw in error_lower for kw in ["nsig", "signature", "cipher", "n parameter"]):
-        return YTDLPError()
-    
-    # No formats available
-    if any(kw in error_lower for kw in ["no video formats", "requested format not available", "format is not available"]):
-        return UnavailableQualityError()
-    
-    # SABR / unplayable
-    if any(kw in error_lower for kw in ["sabr", "unplayable", "playability"]):
-        return DRMError()
-    
-    # Geo-blocked
-    if any(kw in error_lower for kw in ["not available in your country", "geo", "blocked", "unavailable in your region"]):
+    if any(k in e for k in ["nsig", "signature", "cipher"]):
+        return ExtractionError(hint="Update yt-dlp: pip install -U yt-dlp")
+    if any(k in e for k in ["not available in your country", "geo", "blocked"]):
         return GeoBlockedError()
-    
-    # Live stream
-    if any(kw in error_lower for kw in ["live stream", "is live", "live event"]):
+    if any(k in e for k in ["live stream", "is live"]):
         return LiveStreamError()
-    
-    # Network errors
-    if any(kw in error_lower for kw in ["network", "connection", "timeout", "unreachable", "getaddrinfo"]):
+    if any(k in e for k in ["network", "connection", "timeout"]):
         return NetworkError()
-    
-    # Invalid URL
-    if any(kw in error_lower for kw in ["invalid url", "unsupported url", "no video id"]):
+    if any(k in e for k in ["invalid url", "unsupported url"]):
         return InvalidURLError()
     
-    # Generic extraction error
-    if any(kw in error_lower for kw in ["extract", "unable to extract"]):
-        return ExtractionError()
-    
-    # Default to generic download error
     return DownloadError(message=f"Download failed: {error_str[:100]}")

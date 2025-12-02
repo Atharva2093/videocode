@@ -1,27 +1,22 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>YouTube Downloader</title>
-  <link rel="stylesheet" href="styles.css" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Download YouTube videos as MP4">
+  <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📹</text></svg>">
 </head>
 <body>
   <div class="app">
     <header>
       <h1>📹 YouTube Downloader</h1>
-      <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+      <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
     </header>
 
     <div class="card">
-      <input id="url" class="input" type="text" placeholder="Paste YouTube URL here" />
-
-      <div class="format-selector">
-        <button id="btnMp4" class="format-btn active" onclick="setFormat('mp4')">🎬 MP4</button>
-        <button id="btnMp3" class="format-btn" onclick="setFormat('mp3')">🎵 MP3</button>
-      </div>
-
+      <input id="url" class="input" type="url" placeholder="Paste YouTube URL here" autocomplete="off">
       <button class="btn primary" onclick="getInfo()">Fetch Video</button>
 
       <div id="loading" class="spinner hidden"></div>
@@ -32,24 +27,23 @@
       </div>
 
       <div id="info"></div>
-
       <div id="qualitySelector" class="quality-selector hidden"></div>
 
       <button id="downloadBtn" class="btn primary download-btn hidden" onclick="onDownloadClick()">
-        ⬇️ Download
+        ⬇️ Download MP4
       </button>
 
       <div id="progressContainer" class="progress hidden">
         <div id="progressBar"></div>
-        <div id="progressPercent">0%</div>
+        <span id="progressPercent">0%</span>
       </div>
 
       <div id="successBox" class="success-box hidden">
-        ✅ Download complete! File saved to selected folder.
+        ✅ Download complete!
       </div>
     </div>
 
-    <h3 class="recent-title">Recent Downloads</h3>
+    <h3 class="section-title">Recent Downloads</h3>
     <div id="history" class="history"></div>
 
     <footer class="footer">
@@ -57,17 +51,23 @@
     </footer>
   </div>
 
-  <!-- Folder selection modal (shown when user clicks "Download") -->
   <div id="folderModal" class="modal hidden" aria-hidden="true">
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="folderModalTitle">
-      <h3 id="folderModalTitle">📁 Choose Save Location</h3>
-      <p>Select the folder where you want to save this video.</p>
+    <div class="modal-content" role="dialog" aria-modal="true">
+      <h3>📁 Select Save Location</h3>
+      <p>Choose where to save the video file.</p>
       <div class="modal-actions">
-        <button id="chooseFolderBtn" class="btn primary" onclick="chooseFolderAndStart()">📂 Select Folder & Save</button>
-        <button id="cancelModalBtn" class="btn text" onclick="closeFolderModal()">Cancel</button>
+        <button class="btn primary" onclick="chooseFolderAndStart()">📂 Select Folder</button>
+        <button class="btn secondary" onclick="closeFolderModal()">Cancel</button>
       </div>
-      <p class="modal-note">⚠️ Requires Chrome or Edge. Firefox/Safari are not supported.</p>
+      <p class="modal-note">Requires Chrome or Edge</p>
     </div>
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <div id="floatingProgress" class="floating-progress hidden">
+    <span>⬇️</span>
+    <span id="floatingProgressText">0%</span>
   </div>
 
   <script src="script.js"></script>
