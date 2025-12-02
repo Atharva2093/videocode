@@ -326,125 +326,206 @@ async function streamDownloadToFolder(folder) {
   // Show progress
   progressContainer.classList.remove("hidden");
   progressBar.style.width = "0%";
-  progressPercent.textContent = "Starting...";
+  progressPercent.textContent = "Connecting...";
   
   const formatId = getSelectedFormatId();
   const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
   
+  console.log("[Download] Starting:", downloadUrl);
+  
+  // ========================================
+  // STEP 1: Fetch the download stream
+  // ========================================
   let response;
   try {
     response = await fetch(downloadUrl);
+    console.log("[Download] Response status:", response.status);
   } catch (networkErr) {
+    console.error("[Download] Network error:", networkErr);
     progressContainer.classList.add("hidden");
     showError("Network error: Could not reach server.", "Check your internet connection.");
-    console.error("Fetch error:", networkErr);
     return;
   }
   
-  // Check if response is an error (JSON)
+  // ========================================
+  // STEP 2: Check for error responses
+  // ========================================
   const contentType = response.headers.get("Content-Type") || "";
+  console.log("[Download] Content-Type:", contentType);
+  
   if (contentType.includes("application/json")) {
-    const errData = await response.json().catch(() => ({}));
+    // Server returned an error as JSON
+    let errData = {};
+    try {
+      errData = await response.json();
+    } catch (e) {
+      errData = { message: "Unknown error" };
+    }
+    console.error("[Download] Server error:", errData);
     progressContainer.classList.add("hidden");
     showError(errData.message || "Download failed.", errData.hint || "");
     return;
   }
   
-  // Check HTTP status
   if (!response.ok) {
+    console.error("[Download] HTTP error:", response.status);
     progressContainer.classList.add("hidden");
     showError(`Server error: ${response.status} ${response.statusText}`, "Try again later.");
     return;
   }
   
-  // Extract filename from Content-Disposition header
-  let filename = getFilenameFromContentDisposition(response.headers.get("Content-Disposition"));
-  if (!filename) {
-    // Fallback: sanitize title
-    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
-    filename = sanitizeFilename(currentTitle) + ext;
+  // ========================================
+  // STEP 3: Verify response body exists
+  // ========================================
+  if (!response.body) {
+    console.error("[Download] No response body");
+    progressContainer.classList.add("hidden");
+    showError("Download failed.", "Server did not return file data.");
+    return;
   }
   
-  // Get Content-Length for progress calculation
-  const contentLength = parseInt(response.headers.get("Content-Length") || "0", 10);
+  // ========================================
+  // STEP 4: Extract filename
+  // ========================================
+  const disposition = response.headers.get("Content-Disposition");
+  console.log("[Download] Content-Disposition:", disposition);
   
-  // Create file handle in selected folder
+  let filename = extractFilename(disposition);
+  if (!filename) {
+    // Generate fallback filename
+    const ext = selectedFormat === "mp3" ? ".mp3" : ".mp4";
+    const timestamp = Date.now();
+    const safeName = sanitizeFilename(currentTitle) || "video";
+    filename = `${safeName}_${timestamp}${ext}`;
+  }
+  console.log("[Download] Filename:", filename);
+  
+  // ========================================
+  // STEP 5: Get content length for progress
+  // ========================================
+  const contentLengthHeader = response.headers.get("Content-Length");
+  const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+  console.log("[Download] Total bytes:", totalBytes);
+  
+  // ========================================
+  // STEP 6: Create file in selected folder
+  // ========================================
   let fileHandle;
   try {
     fileHandle = await folder.getFileHandle(filename, { create: true });
+    console.log("[Download] File handle created");
   } catch (err) {
+    console.error("[Download] getFileHandle error:", err);
     progressContainer.classList.add("hidden");
-    showError("Could not create file in selected folder.", "Check folder permissions and try again.");
-    console.error("getFileHandle error:", err);
+    showError("Could not create file.", "Check folder permissions and try again.");
     return;
   }
   
-  // Open writable stream
+  // ========================================
+  // STEP 7: Open writable stream
+  // ========================================
   let writable;
   try {
     writable = await fileHandle.createWritable();
+    console.log("[Download] Writable stream opened");
   } catch (err) {
+    console.error("[Download] createWritable error:", err);
     progressContainer.classList.add("hidden");
-    showError("Could not open file for writing.", "Check folder permissions.");
-    console.error("createWritable error:", err);
+    showError("Could not open file for writing.", "The file may be locked or folder is read-only.");
     return;
   }
   
-  // Get response body reader for streaming
-  const reader = response.body.getReader();
+  // ========================================
+  // STEP 8: Stream and write chunks
+  // ========================================
+  progressPercent.textContent = "Downloading...";
+  
+  let reader;
+  try {
+    reader = response.body.getReader();
+  } catch (err) {
+    console.error("[Download] getReader error:", err);
+    try { await writable.abort(); } catch (e) {}
+    progressContainer.classList.add("hidden");
+    showError("Could not read download stream.", "Please try again.");
+    return;
+  }
+  
   let receivedBytes = 0;
+  let lastProgressUpdate = 0;
   
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      const readResult = await reader.read();
       
-      if (done) {
+      if (readResult.done) {
+        console.log("[Download] Stream complete, total:", receivedBytes);
         break;
       }
       
-      // Write chunk to file
-      await writable.write(value);
-      receivedBytes += value.length;
+      const chunk = readResult.value;
+      if (!chunk || chunk.length === 0) {
+        continue; // Skip empty chunks
+      }
       
-      // Update progress bar
-      if (contentLength > 0) {
-        const percent = Math.min(100, Math.round((receivedBytes / contentLength) * 100));
-        progressBar.style.width = percent + "%";
-        progressPercent.textContent = percent + "%";
-      } else {
-        // No Content-Length: show bytes downloaded
-        const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
-        progressBar.style.width = "50%"; // Indeterminate
-        progressPercent.textContent = `${mb} MB`;
+      // Write chunk to file
+      await writable.write(chunk);
+      receivedBytes += chunk.length;
+      
+      // Throttle progress updates (every 100ms)
+      const now = Date.now();
+      if (now - lastProgressUpdate > 100) {
+        lastProgressUpdate = now;
+        
+        if (totalBytes > 0) {
+          const percent = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
+          progressBar.style.width = percent + "%";
+          progressPercent.textContent = `${percent}%`;
+        } else {
+          const mb = (receivedBytes / (1024 * 1024)).toFixed(1);
+          progressBar.style.width = "60%";
+          progressPercent.textContent = `${mb} MB`;
+        }
       }
     }
     
-    // Close the writable stream to finalize the file
+    // ========================================
+    // STEP 9: Finalize file
+    // ========================================
     await writable.close();
+    console.log("[Download] File saved successfully");
     
-    // Success!
+    // Success UI
     progressBar.style.width = "100%";
-    progressPercent.textContent = "100%";
+    progressPercent.textContent = "100% - Complete!";
     
-    // Save to history
     saveToHistory(currentTitle, filename);
     showSuccess();
     
-    // Hide progress bar after delay
+    // Hide progress after delay
     setTimeout(() => {
       progressContainer.classList.add("hidden");
       progressBar.style.width = "0%";
       progressPercent.textContent = "0%";
-    }, 2000);
+    }, 2500);
     
   } catch (streamErr) {
-    console.error("Streaming error:", streamErr);
+    console.error("[Download] Streaming error:", streamErr);
     
-    // Attempt to close writable on error
+    // Try to abort the writable stream
     try {
       await writable.abort();
+      console.log("[Download] Writable aborted");
     } catch (abortErr) {
-      console.error("Abort error:", abortErr);
+      console.error("[Download] Abort error:", abortErr);
+    }
+    
+    // Try to cancel the reader
+    try {
+      await reader.cancel();
+      console.log("[Download] Reader cancelled");
+    } catch (cancelErr) {
+      console.error("[Download] Cancel error:", cancelErr);
     }
     
     progressContainer.classList.add("hidden");
@@ -455,29 +536,30 @@ async function streamDownloadToFolder(folder) {
 // ========================================
 // EXTRACT FILENAME FROM CONTENT-DISPOSITION
 // ========================================
-function getFilenameFromContentDisposition(header) {
+function extractFilename(header) {
   if (!header) return null;
   
-  // Try filename*= (RFC 5987 encoded)
-  let match = /filename\*\s*=\s*(?:UTF-8''|utf-8'')([^;\r\n]+)/i.exec(header);
-  if (match && match[1]) {
-    try {
-      return decodeURIComponent(match[1].replace(/['"]/g, "").trim());
-    } catch (e) {
-      console.warn("Failed to decode filename*:", e);
+  try {
+    // Try filename*= (RFC 5987 encoded) first
+    let match = /filename\*\s*=\s*(?:UTF-8''|utf-8'')?([^;\r\n]+)/i.exec(header);
+    if (match && match[1]) {
+      const decoded = decodeURIComponent(match[1].replace(/['"]/g, "").trim());
+      if (decoded) return decoded;
     }
-  }
-  
-  // Try filename= (quoted)
-  match = /filename\s*=\s*"([^"]+)"/i.exec(header);
-  if (match && match[1]) {
-    return match[1].trim();
-  }
-  
-  // Try filename= (unquoted)
-  match = /filename\s*=\s*([^;\r\n]+)/i.exec(header);
-  if (match && match[1]) {
-    return match[1].replace(/['"]/g, "").trim();
+    
+    // Try filename= with quotes
+    match = /filename\s*=\s*"([^"]+)"/i.exec(header);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    // Try filename= without quotes
+    match = /filename\s*=\s*([^;\s]+)/i.exec(header);
+    if (match && match[1]) {
+      return match[1].replace(/['"]/g, "").trim();
+    }
+  } catch (e) {
+    console.warn("[Download] Filename extraction error:", e);
   }
   
   return null;
