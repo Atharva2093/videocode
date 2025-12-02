@@ -1,29 +1,28 @@
 """
 YouTube Downloader API - FastAPI Backend
-Clean, minimal implementation.
 """
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from simple_downloader import (
-    download_video, 
-    check_ffmpeg, 
-    check_ffprobe, 
-    cleanup_old_files,
-    COOKIES_FILE
-)
+import simple_downloader
 from exceptions import (
-    BaseAPIError, InvalidURLError, MetadataError, DownloadError,
-    DRMError, LiveStreamError, classify_ytdlp_error
+    BaseAPIError,
+    InvalidURLError,
+    MetadataError,
+    DownloadError,
+    DRMError,
+    LiveStreamError,
+    classify_ytdlp_error,
 )
 import yt_dlp
 import os
 import re
 
+
 app = FastAPI(title="YouTube Downloader API")
 
-# CORS middleware
+# CORS - allow all origins for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,76 +36,67 @@ app.add_middleware(
 # STARTUP
 # ========================================
 @app.on_event("startup")
-async def startup_event():
-    """Initialize on startup."""
-    if os.path.exists(COOKIES_FILE):
-        print(f"🍪 Cookies loaded: {COOKIES_FILE}")
-    else:
-        print("⚠️ No cookies.txt found")
+async def startup():
+    print("=" * 50)
+    print("YouTube Downloader API Starting...")
     
-    if check_ffmpeg():
-        print("✅ FFmpeg available")
+    if os.path.exists(simple_downloader.COOKIES_FILE):
+        print(f"✅ Cookies: {simple_downloader.COOKIES_FILE}")
     else:
-        print("⚠️ FFmpeg not found - MP3 conversion won't work")
+        print("⚠️  No cookies.txt found")
+    
+    if simple_downloader.is_ffmpeg_available():
+        print("✅ FFmpeg: Available")
+    else:
+        print("⚠️  FFmpeg: Not found (MP3 won't work)")
     
     # Cleanup old downloads
-    cleanup_old_files(max_age_hours=1)
+    simple_downloader.cleanup_old_downloads(max_age_hours=1)
+    print("=" * 50)
 
 
 # ========================================
 # EXCEPTION HANDLERS
 # ========================================
 @app.exception_handler(BaseAPIError)
-async def api_error_handler(request: Request, exc: BaseAPIError):
+async def handle_api_error(request: Request, exc: BaseAPIError):
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "error": exc.error,
             "message": exc.message,
-            "hint": exc.hint
-        }
+            "hint": exc.hint,
+        },
     )
 
 
 @app.exception_handler(Exception)
-async def generic_error_handler(request: Request, exc: Exception):
-    print(f"Unhandled error: {exc}")
+async def handle_generic_error(request: Request, exc: Exception):
+    print(f"❌ Unhandled error: {exc}")
     return JSONResponse(
         status_code=500,
         content={
             "error": "INTERNAL_ERROR",
-            "message": str(exc),
-            "hint": "Please try again later."
-        }
+            "message": str(exc)[:200],
+            "hint": "Please try again.",
+        },
     )
 
 
 # ========================================
 # HELPERS
 # ========================================
-def validate_youtube_url(url: str) -> bool:
-    """Validate YouTube URL format."""
+def is_valid_youtube_url(url: str) -> bool:
+    """Check if URL looks like a YouTube link."""
     if not url:
         return False
     patterns = [
-        r'(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+',
-        r'(https?://)?(www\.)?youtu\.be/[\w-]+',
-        r'(https?://)?(www\.)?youtube\.com/shorts/[\w-]+',
-        r'(https?://)?(www\.)?youtube\.com/embed/[\w-]+',
+        r"(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]+",
+        r"(https?://)?(www\.)?youtu\.be/[\w-]+",
+        r"(https?://)?(www\.)?youtube\.com/shorts/[\w-]+",
+        r"(https?://)?(www\.)?youtube\.com/embed/[\w-]+",
     ]
-    return any(re.match(pattern, url) for pattern in patterns)
-
-
-def sanitize_filename(name: str) -> str:
-    """Remove illegal characters from filename."""
-    if not name:
-        return "video"
-    # Remove illegal chars
-    name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', name)
-    # Collapse whitespace
-    name = re.sub(r'\s+', ' ', name).strip()
-    # Limit length
-    return name[:100] if len(name) > 100 else name
+    return any(re.match(p, url) for p in patterns)
 
 
 # ========================================
@@ -117,15 +107,14 @@ def health():
     """Health check endpoint."""
     return {
         "status": "ok",
-        "ffmpeg": check_ffmpeg(),
-        "ffprobe": check_ffprobe()
+        "ffmpeg": simple_downloader.is_ffmpeg_available(),
     }
 
 
 @app.get("/api/metadata")
-def metadata(url: str):
-    """Get video metadata and available formats."""
-    if not validate_youtube_url(url):
+def get_metadata(url: str):
+    """Fetch video metadata and available formats."""
+    if not is_valid_youtube_url(url):
         raise InvalidURLError()
     
     ydl_opts = {
@@ -133,12 +122,10 @@ def metadata(url: str):
         "no_warnings": True,
         "skip_download": True,
         "nocheckcertificate": True,
-        "ignoreerrors": False,
-        "no_color": True,
     }
     
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
+    if os.path.exists(simple_downloader.COOKIES_FILE):
+        ydl_opts["cookiefile"] = simple_downloader.COOKIES_FILE
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -150,49 +137,41 @@ def metadata(url: str):
             if info.get("is_live"):
                 raise LiveStreamError()
             
-            # Collect formats
+            # Parse formats
             video_formats = []
             audio_formats = []
             
             for f in info.get("formats", []):
-                if not f.get("url") or f.get("has_drm"):
+                if not f.get("url"):
+                    continue
+                if f.get("has_drm"):
                     continue
                 
-                format_id = f.get("format_id", "")
-                ext = f.get("ext", "unknown")
-                filesize = f.get("filesize") or f.get("filesize_approx")
+                fmt = {
+                    "format_id": f.get("format_id", ""),
+                    "ext": f.get("ext", ""),
+                    "filesize": f.get("filesize") or f.get("filesize_approx"),
+                }
+                
                 vcodec = f.get("vcodec", "none")
                 acodec = f.get("acodec", "none")
-                height = f.get("height")
-                fps = f.get("fps")
-                abr = f.get("abr")
-                
                 has_video = vcodec != "none"
                 has_audio = acodec != "none"
                 
                 if has_video:
-                    video_formats.append({
-                        "format_id": format_id,
-                        "ext": ext,
-                        "filesize": filesize,
-                        "height": height,
-                        "fps": fps,
-                        "has_audio": has_audio,
-                        "type": "video"
-                    })
+                    fmt["height"] = f.get("height")
+                    fmt["fps"] = f.get("fps")
+                    fmt["has_audio"] = has_audio
+                    fmt["type"] = "video"
+                    video_formats.append(fmt)
                 elif has_audio:
-                    audio_formats.append({
-                        "format_id": format_id,
-                        "ext": ext,
-                        "filesize": filesize,
-                        "abr": abr,
-                        "type": "audio"
-                    })
+                    fmt["abr"] = f.get("abr")
+                    fmt["type"] = "audio"
+                    audio_formats.append(fmt)
             
-            # Check for DRM
+            # Check for DRM if no formats found
             if not video_formats and not audio_formats:
-                has_drm = any(f.get("has_drm") for f in info.get("formats", []))
-                if has_drm:
+                if any(f.get("has_drm") for f in info.get("formats", [])):
                     raise DRMError()
             
             return {
@@ -203,7 +182,7 @@ def metadata(url: str):
                 "video_formats": video_formats,
                 "audio_formats": audio_formats,
             }
-            
+    
     except BaseAPIError:
         raise
     except Exception as e:
@@ -211,59 +190,67 @@ def metadata(url: str):
 
 
 @app.get("/api/download")
-def download(url: str, format_id: str = "best"):
-    """Download video/audio and stream to client."""
-    if not validate_youtube_url(url):
+def download_video(url: str, format_id: str = "best"):
+    """Download video and stream to client."""
+    if not is_valid_youtube_url(url):
         raise InvalidURLError()
+    
+    filepath = None
     
     try:
         # Download the file
-        filepath = download_video(url, format_id)
+        filepath, filename = simple_downloader.download(url, format_id)
         
         if not filepath or not os.path.exists(filepath):
             raise DownloadError(
-                message="Download completed but file was not created.",
-                hint="Try again or select a different quality."
+                message="Download completed but file not found.",
+                hint="Try again or select a different quality.",
             )
         
-        # Get file info
-        filename = os.path.basename(filepath)
         filesize = os.path.getsize(filepath)
         ext = os.path.splitext(filename)[1].lower()
         
         # Determine content type
-        if ext == ".mp3":
-            content_type = "audio/mpeg"
-        elif ext == ".webm":
-            content_type = "video/webm"
-        elif ext == ".m4a":
-            content_type = "audio/mp4"
-        else:
-            content_type = "video/mp4"
+        content_types = {
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".mkv": "video/x-matroska",
+            ".mp3": "audio/mpeg",
+            ".m4a": "audio/mp4",
+            ".opus": "audio/opus",
+        }
+        content_type = content_types.get(ext, "application/octet-stream")
         
-        # Stream the file
-        def file_iterator():
+        # Create streaming response
+        def stream_file():
+            nonlocal filepath
             try:
                 with open(filepath, "rb") as f:
-                    while chunk := f.read(1024 * 1024):  # 1MB chunks
+                    while True:
+                        chunk = f.read(1024 * 1024)  # 1MB chunks
+                        if not chunk:
+                            break
                         yield chunk
             finally:
-                # Clean up file after streaming
-                try:
-                    os.remove(filepath)
-                except Exception:
-                    pass
+                # Cleanup after streaming
+                simple_downloader.cleanup_file(filepath)
         
         return StreamingResponse(
-            file_iterator(),
+            stream_file(),
             media_type=content_type,
             headers={
                 "Content-Disposition": f'attachment; filename="{filename}"',
                 "Content-Length": str(filesize),
-            }
+            },
         )
-        
+    
     except BaseAPIError:
+        # Cleanup on known errors
+        if filepath:
+            simple_downloader.cleanup_file(filepath)
         raise
     except Exception as e:
+        # Cleanup on unknown errors
+        if filepath:
+            simple_downloader.cleanup_file(filepath)
         raise classify_ytdlp_error(str(e))
