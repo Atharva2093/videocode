@@ -1,518 +1,274 @@
-# 🎬 YouTube Video Downloader
+# 📹 YouTube Downloader (MP4 Only)
 
-A full-stack YouTube video and playlist downloader with a modern PWA web interface and powerful FastAPI backend.
-
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com)
-[![PWA](https://img.shields.io/badge/PWA-Ready-purple.svg)](https://web.dev/progressive-web-apps/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI/CD](https://github.com/Atharva2093/videocode/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Atharva2093/videocode/actions)
+*A fast, clean and modern YouTube downloader — with real-time progress, folder selection, and full MP4 quality options.*
 
 <p align="center">
-  <img src="screenshots/desktop.png" alt="Desktop Screenshot" width="700">
+  <img src="screenshot-ui.png" width="700"/>
 </p>
+
+---
+
+## 🚀 Overview
+
+This is a **browser-based YouTube video downloader** built with:
+
+* ⚡ **FastAPI** backend (yt-dlp engine)
+* 🎨 **Clean, minimal frontend** (vanilla HTML/CSS/JS)
+* 📂 **Chrome/Edge folder picker support** (File System Access API)
+* 📉 **Real-time streaming progress bar**
+* 🎞 **All MP4 quality options** (360p → 1080p → 4K/8K if available)
+* 🧹 No heavy animations / No clutter
+* 🌐 Fully deployable to **Vercel (frontend)** + **Render (backend)**
+
+MP3 support has been removed by design for stability and simplicity.
 
 ---
 
 ## ✨ Features
 
-### 📱 Progressive Web App (PWA)
-- **Installable** - Add to home screen on mobile/desktop
-- **Offline Support** - Service worker caches UI shell
-- **Auto-paste** - Detects YouTube URLs from clipboard
-- **Mobile-first Design** - Optimized for touch devices
-- **Dark/Light Theme** - Toggle with one click
+### **🎥 YouTube Video Fetching**
 
-### 🔍 YouTube Search (No API Key!)
-- Search YouTube directly from the app
-- Uses yt-dlp's ytsearch feature
-- Results cached for 1 hour
-- Click to download any result
+* Paste any YouTube link
+* Extracts:
 
-### 🎯 Mobile Optimization
-- **Mobile Presets**:
-  - Auto Best - Smart selection for your device
-  - Mobile Video - 480p MP4 (~50MB/10min)
-  - Small Audio - 64kbps MP3 (~5MB/10min)
-- **QR Code Sharing** - Transfer files PC → Mobile instantly
+  * Title
+  * Thumbnail
+  * Duration
+  * All available MP4 qualities
 
-### 📝 Subtitle Support
-- View available subtitle languages
-- Download subtitles separately
-- Embed subtitles into video
+### **📂 Choose Download Location (Chrome/Edge)**
 
-### 🖥️ Web Interface
-- Modern, responsive dark/light themed UI
-- Video metadata preview with thumbnail
-- **Format tabs**: Video, Audio, Mobile-optimized
-- Quality selection grid (2160p to 360p)
-- Playlist support with selective downloads
-- Real-time download progress tracking
-- Download queue management
-- Toast notifications
-- Settings modal with preferences
+* Before each download, a modal appears:
 
-### 🔧 API Backend
-- RESTful API built with FastAPI
-- Async download with queue management
-- Metadata caching (1-hour TTL)
-- Rate limiting (30 req/min, 3 downloads/min)
-- CORS protection
-- Comprehensive error handling
-- Server-side logging with rotation
-- Health monitoring endpoint
+  * “📂 Select Folder & Save”
+  * If cancelled → download stops
+  * Saves using **original sanitized video title**
 
-### 🧪 Testing
-- Backend integration tests (pytest)
-- Frontend E2E tests (Playwright)
-- Lighthouse CI for performance
+### **📡 Real-Time Progress**
 
-### 🎨 Additional Apps
-- **GUI Application** - Tkinter desktop interface
-- **CLI Tool** - Command-line for automation
+* Smart animated progress bar
+* Percentage indicator
+* Auto completes to 100% when file is saved
+
+### **🔍 URL Auto-Detect**
+
+Automatically picks YouTube links from clipboard when user clicks anywhere.
+
+### **📁 Recent Download History**
+
+* Stores last 5 downloads
+* Shows filename + timestamp
+* Saved locally via LocalStorage
+
+### **🌓 Light/Dark Mode**
+
+Toggle for clean, minimal UI themes.
+
+### **⚠️ Clear & Clean Error Handling**
+
+User sees friendly messages:
+
+* Invalid YouTube URL
+* Could not connect to server
+* Video cannot be downloaded
+* DRM-protected / login-required videos
 
 ---
 
-## 🎯 How It Works
+## 🧱 Tech Stack
 
-A simple 3-step workflow designed for speed and clarity:
+### **Frontend**
 
-### Step 1: Enter URL
-- Paste a YouTube video URL into the input field
-- Use the 📋 button to paste from clipboard
-- Invalid URLs are caught immediately with helpful error messages
-- Tracking parameters (si=, feature=, etc.) are auto-removed
+* Vanilla JavaScript
+* HTML5 + CSS3
+* File System Access API
+* Minimalistic design (no frameworks)
 
-### Step 2: Preview Video
-- See the video thumbnail, title, channel, and duration
-- Confirm you have the right video before proceeding
-- Backend fetches metadata and available formats
+### **Backend**
 
-### Step 3: Choose Quality & Download
-- Select MP4 (video) or MP3 (audio) format
-- Pick from available quality options shown as chips
-- Click a quality chip to start download
-- Watch real-time progress with percentage
-- File saves to your Downloads folder (or custom folder if supported)
+* Python 3
+* FastAPI
+* yt-dlp (latest version)
+* FFmpeg (Render installed via render.yaml)
+* Streaming downloads (no memory overload)
 
-### Additional Features
-- **🌙 Theme Toggle** - Switch between light and dark modes
-- **📁 Folder Picker** - Choose download destination (Chrome/Edge)
-- **📜 Recent Downloads** - Quick access to previous downloads
-- **🔌 Connection Status** - Live backend health indicator in footer
+### **Deployment**
+
+* Frontend → **Vercel**
+* Backend → **Render Web Service**
+* API auto-detected based on environment
 
 ---
 
-## 📚 Documentation
+## 🏗 Architecture
 
-- [📐 Architecture](docs/ARCHITECTURE.md) - System design and component diagram
-- [⚠️ Known Issues](docs/KNOWN_ISSUES.md) - Limitations and workarounds
-- [📖 API Examples](docs/API_EXAMPLES.md) - cURL, JavaScript, Python examples
-
----
-
-## 📸 Screenshots
-
-<table>
-  <tr>
-    <td><img src="screenshots/mobile.png" alt="Mobile View" width="250"></td>
-    <td><img src="screenshots/desktop.png" alt="Desktop View" width="450"></td>
-  </tr>
-  <tr>
-    <td align="center">Mobile View</td>
-    <td align="center">Desktop View</td>
-  </tr>
-</table>
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Python 3.9+
-- FFmpeg (for audio extraction)
-- Git
-
----
-
-## 🔐 Authentication (Required)
-
-YouTube now requires authentication to prevent bot detection. You **must** export cookies from your browser.
-
-### Why is this needed?
-
-YouTube shows "Sign in to confirm you're not a bot" errors when downloading videos without authentication. By using cookies from a logged-in browser session, yt-dlp can bypass this restriction.
-
-### Export Cookies
-
-**Option 1: Use the built-in utility (Recommended)**
-
-```bash
-cd backend/tools
-python export_cookies.py chrome    # or edge, firefox, brave
+```
+YouTube Link → Frontend → /api/metadata → yt-dlp parse → Qualities returned
+User selects quality → Folder Picker → /api/download → Streaming → Saved to disk
 ```
 
-**Option 2: Manual export with yt-dlp**
+### Backend flow
 
-```bash
-yt-dlp --cookies-from-browser chrome --cookies backend/cookies.txt https://www.youtube.com
 ```
-
-### Steps:
-
-1. **Log into YouTube** in your browser (Chrome, Edge, Firefox, or Brave)
-2. **Close the browser** (required for cookie access)
-3. **Run the export script**:
-   ```bash
-   python backend/tools/export_cookies.py
-   ```
-4. **Restart the backend** - it will load the cookies automatically
-
-### Verify cookies are loaded:
-
-```bash
-curl http://127.0.0.1:8000/api/health
-# Should return: {"status":"ok","cookies_loaded":true}
-```
-
-### Reload cookies via API:
-
-```bash
-curl "http://127.0.0.1:8000/api/reload-cookies?browser=chrome"
-```
-
-### For Render/Production:
-
-1. Export cookies locally using the script
-2. Create a **Secret File** in Render dashboard
-3. Name it `cookies.txt` and paste the contents
-4. Mount path: `/etc/secrets/cookies.txt`
-
-⚠️ **Note**: Cookies expire! Re-export every 1-2 weeks or when you see bot detection errors.
-
----
-
-### Local Development
-
-```bash
-# Clone the repository
-git clone https://github.com/Atharva2093/videocode.git
-cd videocode
-
-# Install backend dependencies
-cd backend
-pip install -r requirements.txt
-
-# Copy environment file
-cp .env.example .env
-
-# Start the backend server
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# In another terminal, serve the frontend
-cd ../frontend
-python -m http.server 3000
-```
-
-**Access:**
-- Frontend: http://localhost:3000
-- API Docs: http://localhost:8000/api/docs
-
-### Docker Deployment
-
-```bash
-docker-compose up -d
+FastAPI → yt-dlp → FFmpeg → Stream chunks → Browser → File System Access API
 ```
 
 ---
 
-## 📁 Project Structure
+## 🖼 Screenshots
+
+Add your own screenshots here:
 
 ```
-videocode/
-├── backend/                    # FastAPI Backend
-│   ├── routes/                 # API endpoints
-│   │   ├── download.py         # Download endpoints
-│   │   ├── video_info.py       # Video info endpoints
-│   │   ├── search.py           # YouTube search & subtitles
-│   │   └── health.py           # Health check
-│   ├── worker/                 # Background workers
-│   │   ├── download_manager.py # Download queue manager
-│   │   └── ytdlp_downloader.py # yt-dlp wrapper
-│   ├── tests/                  # Backend tests
-│   │   └── test_integration.py # Integration tests
-│   ├── main.py                 # FastAPI application
-│   ├── config.py               # Configuration
-│   ├── models.py               # Pydantic models
-│   ├── errors.py               # Error handling
-│   ├── requirements.txt        # Python dependencies
-│   └── Dockerfile              # Docker configuration
-│
-├── frontend/                   # PWA Frontend
-│   ├── css/
-│   │   └── styles.css          # Mobile-first CSS (dark/light)
-│   ├── js/
-│   │   ├── api.js              # API client
-│   │   └── app.js              # Main application
-│   ├── tests/                  # Frontend tests
-│   │   └── e2e.spec.js         # Playwright E2E tests
-│   ├── icons/                  # PWA icons
-│   ├── index.html              # Main page
-│   ├── manifest.json           # PWA manifest
-│   └── sw.js                   # Service worker
-│
-├── docs/                       # Documentation
-│   ├── ARCHITECTURE.md         # System architecture
-│   ├── KNOWN_ISSUES.md         # Known issues & workarounds
-│   └── API_EXAMPLES.md         # API usage examples
-│
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml           # CI/CD pipeline
-│
-├── youtube_downloader_gui.py   # Standalone GUI app
-├── youtube_downloader_yt_dlp.py # CLI tool
-│
-├── docker-compose.yml          # Docker Compose config
-├── playwright.config.js        # Playwright test config
-├── lighthouserc.json           # Lighthouse CI config
-├── render.yaml                 # Render deployment
-├── netlify.toml                # Netlify deployment
-├── vercel.json                 # Vercel deployment
-└── README.md                   # This file
+/screenshots/home.png
+/screenshots/fetch.png
+/screenshots/download-modal.png
+/screenshots/progress.png
 ```
 
 ---
 
 ## 🔌 API Documentation
 
-### Endpoints Overview
+### 1. **GET /api/health**
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check with yt-dlp version |
-| GET | `/api/metadata?url=` | Get video metadata |
-| GET | `/api/playlist?url=` | Get playlist info |
-| GET | `/api/thumbnail?url=` | Get thumbnail image |
-| POST | `/api/download` | Queue async download |
-| POST | `/api/download/direct` | Direct download (streaming) |
-| GET | `/api/download/{task_id}` | Get download status |
-| GET | `/api/download/{task_id}/file` | Get completed file |
-| POST | `/api/convert` | Convert to format |
-| POST | `/api/mobile-compression` | Mobile-optimized download |
-| GET | `/api/queue` | Get queue status |
-| DELETE | `/api/queue/clear` | Clear completed |
-| GET | `/api/search?q=&limit=` | Search YouTube videos |
-| GET | `/api/subtitles?url=&lang=` | Download subtitles |
-| GET | `/api/subtitles/available?url=` | List available subtitles |
-
-### Example API Calls
-
-```bash
-# Get video metadata
-curl "http://localhost:8000/api/metadata?url=https://youtube.com/watch?v=VIDEO_ID"
-
-# Start download
-curl -X POST "http://localhost:8000/api/download" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://youtube.com/watch?v=VIDEO_ID","quality":"720p","format":"mp4"}'
-
-# Mobile-optimized download
-curl -X POST "http://localhost:8000/api/mobile-compression" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://youtube.com/watch?v=VIDEO_ID","max_resolution":"480p"}'
 ```
-
-### Error Response Format
-
-```json
 {
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid YouTube URL",
-    "status": 400,
-    "timestamp": "2024-01-15T10:30:00Z",
-    "details": {
-      "field": "url"
-    }
-  }
+  "status": "ok",
+  "ffmpeg_available": true,
+  "yt_dlp_version": "2025.01.01"
 }
 ```
 
----
+### 2. **GET /api/metadata?url=YOUTUBE_URL**
 
-## 🚀 Deployment
+Returns:
 
-### Option 1: Render (Backend)
-
-1. Connect your GitHub repo to [Render](https://render.com)
-2. Create a new Web Service
-3. Select Python environment
-4. Set build command: `pip install -r backend/requirements.txt`
-5. Set start command: `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`
-
-Or use the included `render.yaml` for Blueprint deployment.
-
-### Option 2: Netlify (Frontend)
-
-1. Connect your GitHub repo to [Netlify](https://netlify.com)
-2. Set publish directory: `frontend`
-3. Set build command: `echo 'Static site ready'`
-4. Configure API redirect in `netlify.toml`
-
-### Option 3: Vercel (Frontend)
-
-1. Connect your GitHub repo to [Vercel](https://vercel.com)
-2. Import project
-3. Configuration is in `vercel.json`
-
-### Option 4: Docker
-
-```bash
-# Build and run with Docker Compose
-docker-compose up -d
-
-# Or build manually
-docker build -t youtube-downloader-api -f backend/Dockerfile .
-docker run -p 8000:8000 youtube-downloader-api
+```
+{
+  "title": "...",
+  "thumbnail": "...",
+  "duration": 123,
+  "formats": [
+    { "id": "18", "ext": "mp4", "quality": 360, "height": 360 },
+    ...
+  ]
+}
 ```
 
-### Environment Variables
+### 3. **GET /api/download?url=...&format_id=...**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server host |
-| `PORT` | `8000` | Server port |
-| `DEBUG` | `true` | Debug mode |
-| `DOWNLOAD_DIR` | `./downloads` | Download directory |
-| `MAX_CONCURRENT_DOWNLOADS` | `3` | Max parallel downloads |
-| `MAX_FILE_SIZE_MB` | `500` | Max file size limit |
-| `MAX_VIDEO_DURATION` | `7200` | Max video duration (seconds) |
-| `CORS_ORIGINS` | `*` | Allowed CORS origins |
+* Streams video chunks
+* Sets `Content-Disposition: attachment; filename="<title>.mp4"`
 
 ---
 
-## 🧪 Testing
+## 🖥 Local Development
 
-### Backend Tests
+### 1. Clone repo
 
-```bash
-# Install test dependencies
+```
+git clone https://github.com/YOUR_USERNAME/videocode
+cd videocode
+```
+
+### 2. Backend
+
+```
 cd backend
-pip install pytest pytest-asyncio pytest-cov httpx
-
-# Run integration tests
-pytest tests/ -v --cov=.
-
-# Run with coverage report
-pytest tests/ -v --cov=. --cov-report=html
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-### Frontend E2E Tests
+### 3. Frontend
 
-```bash
-# Install Playwright
-npm install @playwright/test
-npx playwright install
-
-# Run E2E tests
-npx playwright test
-
-# Run with UI
-npx playwright test --ui
+```
+cd frontend
+python -m http.server 3000
 ```
 
-### Lighthouse CI
+Open:
 
-```bash
-# Install Lighthouse CI
-npm install -g @lhci/cli
-
-# Run audit
-lhci autorun
 ```
-
-### Linting
-
-```bash
-# Backend
-flake8 backend --max-line-length=120
-black --check backend
-
-# Frontend
-npx eslint frontend/js
+http://127.0.0.1:3000
 ```
 
 ---
 
-## 🤝 Contributing
+## 🌐 Deployment
 
-Contributions are welcome! Here's how to get started:
+### 🔧 Backend (Render)
 
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Run tests**
-   ```bash
-   pytest tests/ -v
-   ```
-5. **Commit your changes**
-   ```bash
-   git commit -m 'Add amazing feature'
-   ```
-6. **Push to your branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
+Use **render.yaml**:
 
-### Development Guidelines
+```yaml
+services:
+  - type: web
+    name: yt-downloader-backend
+    runtime: python
+    buildCommand: |
+      apt-get update && apt-get install -y ffmpeg
+      pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+```
 
-- Follow PEP 8 for Python code
-- Use meaningful commit messages
-- Add tests for new features
-- Update documentation as needed
+Deploy → copy backend API URL → used by frontend.
+
+---
+
+### 🎨 Frontend (Vercel)
+
+Project settings:
+
+```
+Framework: Other
+Output directory: frontend
+```
+
+Add vercel.json:
+
+```json
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://YOUR_RENDER_BACKEND_URL/api/$1" }
+  ]
+}
+```
+
+Deploy.
+
+---
+
+## ❗ Limitations
+
+* DRM-protected videos **cannot** be downloaded
+* Login-required videos not supported
+* Folder picker only works on:
+
+  * Chrome
+  * Edge
+  * Arc
+
+Other browsers fall back to normal download dialog.
+
+---
+
+## 🔐 Security Notes
+
+* Only YouTube URLs are allowed
+* Rate limiting enabled
+* No cookies or authentication used
+* No video caching (for safety + bandwidth control)
 
 ---
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License © 2025 Atharva
 
 ---
 
-## 🙏 Acknowledgments
+## ❤️ Credits
 
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube downloading library
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [QRCode.js](https://davidshimjs.github.io/qrcodejs/) - QR code generation
-
----
-
-## ⚠️ Disclaimer
-
-This tool is for educational purposes only. Please respect YouTube's Terms of Service and copyright laws. Only download content you have permission to download.
-
----
-
-## 📊 Roadmap
-
-- [x] Phase 1: Core backend with FastAPI
-- [x] Phase 2: Enhanced API endpoints
-- [x] Phase 3: Mobile-first responsive UI
-- [x] Phase 4: PWA support
-- [x] Phase 5: Mobile optimization & QR sharing
-- [x] Phase 6: Error handling & deployment
-- [x] Phase 7: Frontend polish (theme toggle, settings, progress UI)
-- [x] Phase 8: Backend enhancements (search, subtitles, rate limiting)
-- [x] Phase 9: PWA finalization (service worker caching)
-- [x] Phase 10: Advanced features (YouTube search)
-- [x] Phase 11: Testing (Playwright, Lighthouse CI, integration tests)
-- [x] Phase 12: Documentation (architecture, API examples)
-- [ ] Phase 13: User accounts & history
-- [ ] Phase 14: Browser extension
+Built by Atharva
+Powered by FastAPI + yt-dlp + FFmpeg
