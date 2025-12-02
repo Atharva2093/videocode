@@ -15,10 +15,11 @@ const API = location.hostname.includes("localhost") || location.hostname.include
 // ========================================
 let selectedFormat = "mp4";
 let selectedQuality = null;
+let selectedFormatId = null;  // The actual format_id to send to backend
 let currentVideoData = null;
 let currentVideoUrl = "";
 let selectedFolder = null;
-let availableQualities = [];
+let qualityToFormatMap = {};  // Maps height -> best format_id for that height
 
 // ========================================
 // DOM ELEMENTS
@@ -163,7 +164,7 @@ function setFormat(format) {
     
     // Show/hide quality section based on format
     if (currentVideoData) {
-        if (format === "mp4" && availableQualities.length > 0) {
+        if (format === "mp4" && Object.keys(qualityToFormatMap).length > 0) {
             qualitySection.classList.remove("hidden");
         } else {
             qualitySection.classList.add("hidden");
@@ -174,42 +175,87 @@ function setFormat(format) {
 // ========================================
 // QUALITY SELECTION
 // ========================================
-function setQuality(quality) {
+function setQuality(quality, formatId) {
     selectedQuality = quality;
+    selectedFormatId = formatId;
     
     document.querySelectorAll(".quality-chip").forEach(chip => {
-        chip.classList.toggle("active", chip.dataset.quality === quality);
+        chip.classList.toggle("active", parseInt(chip.dataset.quality) === quality);
     });
 }
 
-function renderQualityChips(formats) {
-    const qualitySet = new Set();
+function renderQualityChips(videoFormats) {
+    // Build a map of height -> best format for that height
+    // Prefer formats with audio, then by filesize (larger = better quality)
+    qualityToFormatMap = {};
     
-    formats.forEach(f => {
-        if (f.height) {
-            qualitySet.add(f.height);
+    videoFormats.forEach(f => {
+        if (!f.height) return;
+        
+        const height = f.height;
+        const existing = qualityToFormatMap[height];
+        
+        if (!existing) {
+            qualityToFormatMap[height] = f;
+        } else {
+            // Prefer format with audio
+            if (f.has_audio && !existing.has_audio) {
+                qualityToFormatMap[height] = f;
+            }
+            // If both have audio or both don't, prefer larger filesize
+            else if (f.has_audio === existing.has_audio) {
+                const fSize = f.filesize || 0;
+                const eSize = existing.filesize || 0;
+                if (fSize > eSize) {
+                    qualityToFormatMap[height] = f;
+                }
+            }
         }
     });
     
-    availableQualities = Array.from(qualitySet).sort((a, b) => b - a);
+    // Get sorted heights (highest first)
+    const heights = Object.keys(qualityToFormatMap)
+        .map(h => parseInt(h))
+        .sort((a, b) => b - a);
     
-    if (availableQualities.length === 0) {
+    if (heights.length === 0) {
         qualitySection.classList.add("hidden");
         return;
     }
     
-    // Default to 720p or highest available
-    selectedQuality = availableQualities.includes(720) ? 720 : availableQualities[0];
+    // Default to 720p if available, else highest
+    const defaultHeight = heights.includes(720) ? 720 : heights[0];
+    selectedQuality = defaultHeight;
+    selectedFormatId = qualityToFormatMap[defaultHeight].format_id;
     
-    qualityChips.innerHTML = availableQualities.map(q => `
-        <button 
-            class="quality-chip ${q === selectedQuality ? 'active' : ''}" 
-            data-quality="${q}"
-            onclick="setQuality(${q})"
-        >
-            ${q}p
-        </button>
-    `).join("");
+    // Render chips
+    qualityChips.innerHTML = heights.map(h => {
+        const format = qualityToFormatMap[h];
+        const sizeStr = format.filesize ? formatFileSize(format.filesize) : "";
+        const fpsStr = format.fps && format.fps > 30 ? ` ${format.fps}fps` : "";
+        const label = `${h}p${fpsStr}`;
+        
+        return `
+            <button 
+                class="quality-chip ${h === defaultHeight ? 'active' : ''}" 
+                data-quality="${h}"
+                data-format-id="${format.format_id}"
+                onclick="setQuality(${h}, '${format.format_id}')"
+                title="${sizeStr}"
+            >
+                ${label}
+            </button>
+        `;
+    }).join("");
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return "";
+    const mb = bytes / (1024 * 1024);
+    if (mb >= 1000) {
+        return (mb / 1024).toFixed(1) + " GB";
+    }
+    return mb.toFixed(1) + " MB";
 }
 
 // ========================================
@@ -262,7 +308,7 @@ function displayVideoInfo(data) {
     videoTitle.textContent = data.title || "Unknown Title";
     
     // Set channel (if available)
-    videoChannel.textContent = data.channel || data.uploader || "";
+    videoChannel.textContent = data.channel || "";
     
     // Set duration
     if (data.duration) {
@@ -276,9 +322,9 @@ function displayVideoInfo(data) {
     // Show video preview
     videoPreview.classList.remove("hidden");
     
-    // Render quality chips for MP4
-    if (data.formats && data.formats.length > 0) {
-        renderQualityChips(data.formats);
+    // Render quality chips for MP4 using the new video_formats array
+    if (data.video_formats && data.video_formats.length > 0) {
+        renderQualityChips(data.video_formats);
         if (selectedFormat === "mp4") {
             qualitySection.classList.remove("hidden");
         }
@@ -314,72 +360,155 @@ async function startDownload() {
     hideError();
     hideSuccess();
     showProgress();
+    updateProgress(0);
     
+    // Determine format_id to use
     const formatId = selectedFormat === "mp3" 
         ? "mp3" 
-        : `best[height<=${selectedQuality || 720}]`;
+        : (selectedFormatId || "best");
     
     const downloadUrl = `${API}/download?url=${encodeURIComponent(currentVideoUrl)}&format_id=${encodeURIComponent(formatId)}`;
     
-    // Simulate progress
-    let progress = 0;
-    const interval = setInterval(() => {
-        if (progress < 90) {
-            progress += Math.random() * 15;
-            updateProgress(Math.min(progress, 90));
-        }
-    }, 300);
-    
     try {
-        if (selectedFolder) {
-            // Download to selected folder
-            const response = await fetch(downloadUrl);
-            
-            // Check for error response
-            const contentType = response.headers.get("content-type");
-            if (contentType && contentType.includes("application/json")) {
-                const data = await response.json();
-                clearInterval(interval);
-                hideProgress();
-                showError(data.message || data.error, data.hint || "");
-                return;
-            }
-            
-            const blob = await response.blob();
-            const fileName = getFileName(response, currentVideoData?.title);
-            
-            const fileHandle = await selectedFolder.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-            
-            clearInterval(interval);
-            updateProgress(100);
-            
-            setTimeout(() => {
-                hideProgress();
-                showSuccess();
-                saveToHistory(currentVideoData?.title || currentVideoUrl);
-            }, 500);
-            
-        } else {
-            // Browser download
-            clearInterval(interval);
-            updateProgress(100);
-            
-            setTimeout(() => {
-                hideProgress();
-                showSuccess();
-                saveToHistory(currentVideoData?.title || currentVideoUrl);
-                window.location.href = downloadUrl;
-            }, 500);
+        const response = await fetch(downloadUrl);
+        
+        // Check for error response
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            const data = await response.json();
+            hideProgress();
+            showError(data.message || data.error, data.hint || "");
+            return;
         }
         
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        // Get filename from Content-Disposition header
+        const fileName = getFileName(response, currentVideoData?.title);
+        
+        // Get content length for progress (if available)
+        const contentLength = response.headers.get("content-length");
+        const totalSize = contentLength ? parseInt(contentLength) : null;
+        
+        if (selectedFolder) {
+            // Download to selected folder using File System Access API with streaming
+            await downloadToFolder(response, fileName, totalSize);
+        } else {
+            // Fallback: Browser download
+            await downloadWithBlob(response, fileName, totalSize);
+        }
+        
+        updateProgress(100);
+        setTimeout(() => {
+            hideProgress();
+            showSuccess();
+            saveToHistory(currentVideoData?.title || currentVideoUrl);
+        }, 300);
+        
     } catch (err) {
-        clearInterval(interval);
+        console.error("Download error:", err);
         hideProgress();
-        showError("Download failed", "Please try again");
+        
+        // If folder download failed, try fallback
+        if (selectedFolder && err.message !== "User cancelled") {
+            showError("Folder save failed, trying browser download...", "");
+            selectedFolder = null;
+            folderStatus.classList.add("hidden");
+            setTimeout(() => startDownload(), 500);
+            return;
+        }
+        
+        showError("Download failed", err.message || "Please try again");
     }
+}
+
+// Download to selected folder using streaming
+async function downloadToFolder(response, fileName, totalSize) {
+    try {
+        // Verify we still have permission
+        const permission = await selectedFolder.queryPermission({ mode: "readwrite" });
+        if (permission !== "granted") {
+            const requestResult = await selectedFolder.requestPermission({ mode: "readwrite" });
+            if (requestResult !== "granted") {
+                throw new Error("Folder permission denied");
+            }
+        }
+        
+        // Create file handle
+        const fileHandle = await selectedFolder.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        
+        // Stream the response body
+        const reader = response.body.getReader();
+        let receivedBytes = 0;
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            await writable.write(value);
+            receivedBytes += value.length;
+            
+            // Update progress
+            if (totalSize) {
+                const percent = (receivedBytes / totalSize) * 100;
+                updateProgress(Math.min(percent, 99));
+            } else {
+                // No content-length, show indeterminate progress
+                updateProgress(Math.min(receivedBytes / 1000000 * 10, 90));
+            }
+        }
+        
+        await writable.close();
+        
+        // Update folder status
+        folderStatus.textContent = "✅ Saved to selected folder";
+        folderStatus.classList.remove("hidden");
+        
+    } catch (err) {
+        console.error("Folder save error:", err);
+        throw err;
+    }
+}
+
+// Fallback: Download using blob and trigger browser download
+async function downloadWithBlob(response, fileName, totalSize) {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let receivedBytes = 0;
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        chunks.push(value);
+        receivedBytes += value.length;
+        
+        // Update progress
+        if (totalSize) {
+            const percent = (receivedBytes / totalSize) * 100;
+            updateProgress(Math.min(percent, 99));
+        } else {
+            updateProgress(Math.min(receivedBytes / 1000000 * 10, 90));
+        }
+    }
+    
+    // Create blob and download
+    const blob = new Blob(chunks);
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    URL.revokeObjectURL(url);
 }
 
 function getFileName(response, title) {
@@ -459,7 +588,9 @@ function resetUI() {
     qualitySection.classList.add("hidden");
     downloadSection.classList.add("hidden");
     currentVideoData = null;
-    availableQualities = [];
+    qualityToFormatMap = {};
+    selectedQuality = null;
+    selectedFormatId = null;
 }
 
 // ========================================

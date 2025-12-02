@@ -59,13 +59,12 @@ def download_video(url, format_id="best"):
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }]
-    elif format_id and format_id.startswith("best[height"):
-        # Quality-based format (e.g., "best[height<=720]")
-        ydl_opts["format"] = f"{format_id}+bestaudio[ext=m4a]/best[ext=mp4]/best"
     elif format_id and format_id != "best":
-        ydl_opts["format"] = f"{format_id}+bestaudio/best"
+        # Specific format_id - merge with best audio if video-only
+        ydl_opts["format"] = f"{format_id}+bestaudio[ext=m4a]/{format_id}+bestaudio/{format_id}/best"
+        ydl_opts["merge_output_format"] = "mp4"
     else:
-        ydl_opts["format"] = "best[ext=mp4]/best"
+        ydl_opts["format"] = "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)

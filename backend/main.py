@@ -135,8 +135,20 @@ def metadata(url: str):
     if not url or not validate_youtube_url(url):
         raise InvalidURLError()
     
-    ydl_opts = get_ydl_opts()
-    ydl_opts["skip_download"] = True
+    # Use minimal options for metadata - don't restrict formats
+    # Important: Don't use player_client restriction here as it limits available formats
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "nocheckcertificate": True,
+        "ignoreerrors": False,
+        "no_color": True,
+    }
+    
+    # Add cookies if file exists
+    if os.path.exists(COOKIES_FILE):
+        ydl_opts["cookiefile"] = COOKIES_FILE
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -149,36 +161,63 @@ def metadata(url: str):
             if info.get("is_live"):
                 raise LiveStreamError()
             
-            # Filter formats that have valid URLs and are not DRM protected
-            valid_formats = []
+            # Collect ALL formats - video, audio, and combined
+            video_formats = []   # Video with or without audio
+            audio_formats = []   # Audio-only formats
+            
             for f in info.get("formats", []):
                 # Skip formats without URLs or with DRM
                 if not f.get("url"):
                     continue
                 if f.get("has_drm"):
                     continue
-                if f.get("vcodec") == "none":
-                    continue
-                    
-                valid_formats.append({
-                    "id": f["format_id"],
-                    "ext": f.get("ext", "mp4"),
-                    "quality": f.get("height"),
-                    "height": f.get("height"),
-                    "filesize": f.get("filesize"),
-                })
+                
+                format_id = f.get("format_id", "")
+                ext = f.get("ext", "unknown")
+                filesize = f.get("filesize") or f.get("filesize_approx")
+                vcodec = f.get("vcodec", "none")
+                acodec = f.get("acodec", "none")
+                height = f.get("height")
+                fps = f.get("fps")
+                abr = f.get("abr")  # audio bitrate
+                
+                has_video = vcodec != "none"
+                has_audio = acodec != "none"
+                
+                if has_video:
+                    # Video format (may or may not have audio)
+                    video_formats.append({
+                        "format_id": format_id,
+                        "ext": ext,
+                        "filesize": filesize,
+                        "height": height,
+                        "fps": fps,
+                        "has_audio": has_audio,
+                        "type": "video"
+                    })
+                elif has_audio and not has_video:
+                    # Audio-only format
+                    audio_formats.append({
+                        "format_id": format_id,
+                        "ext": ext,
+                        "filesize": filesize,
+                        "abr": abr,
+                        "type": "audio"
+                    })
             
             # Check if all formats are DRM protected
-            if not valid_formats and info.get("formats"):
+            if not video_formats and not audio_formats and info.get("formats"):
                 has_drm = any(f.get("has_drm") for f in info.get("formats", []))
                 if has_drm:
                     raise DRMError()
             
             return {
                 "title": info.get("title"),
+                "channel": info.get("channel") or info.get("uploader"),
                 "thumbnail": info.get("thumbnail"),
                 "duration": info.get("duration"),
-                "formats": valid_formats if valid_formats else [{"id": "best", "ext": "mp4", "quality": "best"}],
+                "video_formats": video_formats,
+                "audio_formats": audio_formats,
             }
             
     except BaseAPIError:
