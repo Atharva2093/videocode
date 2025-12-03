@@ -124,12 +124,12 @@ def get_metadata(request: Request, url: str):
         "skip_download": True,
         "nocheckcertificate": True,
         "no_write_cookie_file": True,
+        "cookiesfrombrowser": None,
         "socket_timeout": 15,
     }
 
     if os.path.exists(simple_downloader.COOKIES_FILE):
         ydl_opts["cookiefile"] = simple_downloader.COOKIES_FILE
-        ydl_opts["--cookies"] = simple_downloader.COOKIES_FILE
         logger.info("Cookies loaded")
     else:
         logger.info("Cookies missing")

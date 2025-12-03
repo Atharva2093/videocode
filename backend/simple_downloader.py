@@ -82,6 +82,7 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
         "no_warnings": True,
         "nocheckcertificate": True,
         "no_write_cookie_file": True,
+        "cookiesfrombrowser": None,
         "retries": 10,
         "fragment_retries": 10,
         "file_access_retries": 10,
@@ -97,7 +98,6 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
 
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
-        ydl_opts["--cookies"] = COOKIES_FILE
         logger.info("Cookies loaded")
     else:
         logger.info("Cookies missing")
