@@ -136,9 +136,6 @@ def _is_supported_mp4_format(entry: Dict) -> bool:
     if protocol in {"m3u8", "m3u8_native", "dash", "http_dash_segments"}:
         return False
 
-    if entry.get("acodec", "none") == "none" and "video only" not in format_note:
-        return False
-
     return True
 
 
