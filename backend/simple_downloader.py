@@ -5,13 +5,16 @@ import shutil
 import tempfile
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Iterable, List, Optional
 
 import yt_dlp
+
+from exceptions import InvalidURLError
 
 logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
@@ -111,6 +114,38 @@ def _build_format_selector(format_id: str) -> str:
     return "bestvideo+bestaudio/best"
 
 
+def _is_supported_mp4_format(entry: Dict) -> bool:
+    if not entry or entry.get("has_drm"):
+        return False
+    if not entry.get("url"):
+        return False
+    if entry.get("ext") != "mp4":
+        return False
+    if entry.get("vcodec", "none") in ("none", None):
+        return False
+    if not entry.get("height"):
+        return False
+
+    format_note = (entry.get("format_note") or "").lower()
+    protocol = (entry.get("protocol") or "").lower()
+
+    if "webm" in format_note:
+        return False
+    if any(flag in format_note for flag in ("dash", "hls")):
+        return False
+    if protocol in {"m3u8", "m3u8_native", "dash", "http_dash_segments"}:
+        return False
+
+    if entry.get("acodec", "none") == "none" and "video only" not in format_note:
+        return False
+
+    return True
+
+
+def filter_supported_formats(formats: Iterable[Dict]) -> List[Dict]:
+    return [entry for entry in formats or [] if _is_supported_mp4_format(entry)]
+
+
 def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]) -> dict:
     ydl_opts = {
         "outtmpl": output_template,
@@ -164,11 +199,18 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
+            info = ydl.extract_info(url, download=False)
             if not info:
                 raise RuntimeError("Failed to extract video info")
             if info.get("is_live"):
                 raise RuntimeError("Live streams cannot be downloaded")
+
+            valid_formats = filter_supported_formats(info.get("formats", []))
+            allowed_ids = {fmt.get("format_id") for fmt in valid_formats if fmt.get("format_id")}
+            if format_id and format_id != "best" and format_id not in allowed_ids:
+                raise InvalidURLError(message="Invalid or unsupported format ID.")
+
+            info = ydl.process_ie_result(info, download=True)
 
             requested = info.get("requested_downloads") or []
             candidate_path = None

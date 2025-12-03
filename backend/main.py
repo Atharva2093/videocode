@@ -147,21 +147,14 @@ def get_metadata(request: Request, url: str):
             if info.get("is_live"):
                 raise LiveStreamError()
 
+            supported_formats = simple_downloader.filter_supported_formats(info.get("formats", []))
+
             video_formats = []
-            for entry in info.get("formats", []):
-                if not entry.get("url") or entry.get("has_drm"):
-                    continue
-                ext = entry.get("ext")
-                if ext != "mp4":
-                    continue
-                if entry.get("vcodec", "none") == "none":
-                    continue
-                if not entry.get("height"):
-                    continue
+            for entry in supported_formats:
                 video_formats.append(
                     {
                         "format_id": entry.get("format_id", ""),
-                        "ext": ext,
+                        "ext": entry.get("ext"),
                         "height": entry.get("height"),
                         "fps": entry.get("fps"),
                         "filesize": entry.get("filesize") or entry.get("filesize_approx"),
