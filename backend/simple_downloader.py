@@ -69,24 +69,54 @@ def cleanup_stale_workspaces(max_age_hours: int = 6) -> None:
         logger.info("Removed %s stale workspaces", removed)
 
 
+def prepare_cookie_jar(dest_dir: Optional[str] = None) -> Optional[str]:
+    """Copy the read-only cookies file to a writable location."""
+    if not os.path.exists(COOKIES_FILE):
+        return None
+
+    try:
+        if dest_dir:
+            os.makedirs(dest_dir, exist_ok=True)
+            target_path = os.path.join(dest_dir, "cookies.txt")
+        else:
+            fd, target_path = tempfile.mkstemp(prefix="yt-cookies-", suffix=".txt")
+            os.close(fd)
+
+        shutil.copyfile(COOKIES_FILE, target_path)
+        try:
+            os.chmod(target_path, 0o600)
+        except (PermissionError, NotImplementedError):
+            pass
+
+        return target_path
+    except Exception as exc:
+        logger.warning("Failed to prepare cookie jar: %s", exc)
+        return None
+
+
+def cleanup_cookie_jar(temp_path: Optional[str]) -> None:
+    if not temp_path or temp_path == COOKIES_FILE:
+        return
+    try:
+        os.remove(temp_path)
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        logger.warning("Failed to remove temp cookies file %s: %s", temp_path, exc)
+
+
 def _build_format_selector(format_id: str) -> str:
     if format_id and format_id != "best":
         return f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
     return "bestvideo+bestaudio/best"
 
 
-def get_ydl_opts(output_template: str, format_id: str) -> dict:
+def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]) -> dict:
     ydl_opts = {
         "outtmpl": output_template,
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
-
-        "no_write_cookie_file": True,
-        "reject_cookies": True,
-        "cookiesfrombrowser": None,
-        "updating_cache": False,
-
         "retries": 10,
         "fragment_retries": 10,
         "file_access_retries": 10,
@@ -98,12 +128,13 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
         "noprogress": True,
         "format": _build_format_selector(format_id),
         "merge_output_format": "mp4",
+        "no_write_cookie_file": True,
+        "cookiesfrombrowser": None,
+        "no_cache_dir": True,
     }
 
-    if os.path.exists(COOKIES_FILE):
-        ydl_opts["cookiefile"] = COOKIES_FILE
-        ydl_opts["updating_cache"] = False
-        ydl_opts["reject_cookies"] = True
+    if cookiefile:
+        ydl_opts["cookiefile"] = cookiefile
         logger.info("Cookies loaded")
     else:
         logger.info("Cookies missing")
@@ -126,7 +157,8 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     workspace = tempfile.mkdtemp(prefix="yt-stream-")
     output_template = os.path.join(workspace, "video.%(ext)s")
 
-    ydl_opts = get_ydl_opts(output_template, format_id)
+    cookiefile = prepare_cookie_jar(dest_dir=workspace)
+    ydl_opts = get_ydl_opts(output_template, format_id, cookiefile)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

@@ -118,23 +118,21 @@ def get_metadata(request: Request, url: str):
     if not is_valid_youtube_url(url):
         raise InvalidURLError()
 
+    cookiefile = simple_downloader.prepare_cookie_jar()
+
     ydl_opts = {
-    "quiet": True,
-    "no_warnings": True,
-    "skip_download": True,
-    "nocheckcertificate": True,
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "nocheckcertificate": True,
+        "socket_timeout": 15,
+        "no_write_cookie_file": True,
+        "cookiesfrombrowser": None,
+        "no_cache_dir": True,
+    }
 
-    # ⛔ Block ALL cookie saving
-    "no_write_cookie_file": True,
-    "cookiesfrombrowser": None,
-    "reject_cookies": True,  # <-- ADD THIS (critical)
-
-    "socket_timeout": 15,
-}
-
-
-    if os.path.exists(simple_downloader.COOKIES_FILE):
-        ydl_opts["cookiefile"] = simple_downloader.COOKIES_FILE
+    if cookiefile:
+        ydl_opts["cookiefile"] = cookiefile
         logger.info("Cookies loaded")
     else:
         logger.info("Cookies missing")
@@ -188,6 +186,8 @@ def get_metadata(request: Request, url: str):
     except Exception as exc:
         logger.exception("Metadata error for url %s", url)
         raise classify_ytdlp_error(str(exc))
+    finally:
+        simple_downloader.cleanup_cookie_jar(cookiefile)
 
 
 @app.get("/api/download")
