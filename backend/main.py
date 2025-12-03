@@ -91,14 +91,18 @@ async def on_startup():
 def is_valid_youtube_url(url: str) -> bool:
     if not url or not isinstance(url, str):
         return False
-    patterns = [
-        r"^(https?://)?(www\.)?youtube\.com/watch\?v=[\w-]{11}",
-        r"^(https?://)?(www\.)?youtu\.be/[\w-]{11}",
-        r"^(https?://)?(www\.)?youtube\.com/shorts/[\w-]{11}",
-        r"^(https?://)?(www\.)?youtube\.com/embed/[\w-]{11}",
-    ]
+
     url = url.strip()
-    return any(re.match(pattern, url) for pattern in patterns)
+
+    patterns = [
+        r"^https?://(www\.)?youtube\.com/watch\?v=[\w-]{11}",
+        r"^https?://(www\.)?youtu\.be/[\w-]{11}",
+        r"^https?://(www\.)?youtube\.com/shorts/[\w-]{11}",
+    ]
+
+    base = url.split("?")[0]
+
+    return any(re.match(pattern, base) for pattern in patterns)
 
 
 @app.get("/api/health")
@@ -165,7 +169,8 @@ def get_metadata(request: Request, url: str):
             if not video_formats:
                 if any(f.get("has_drm") for f in info.get("formats", [])):
                     raise DRMError()
-                raise MetadataError(hint="No MP4 formats were found for this video.")
+                logger.error("No MP4 formats found for URL %s", url)
+                raise MetadataError(hint="No downloadable MP4 formats available for this video.")
 
             return {
                 "title": info.get("title"),
