@@ -98,10 +98,10 @@ def is_valid_youtube_url(url: str) -> bool:
         r"^https?://(www\.)?youtube\.com/watch\?v=[\w-]{11}",
         r"^https?://(www\.)?youtu\.be/[\w-]{11}",
         r"^https?://(www\.)?youtube\.com/shorts/[\w-]{11}",
+        r"^https?://(www\.)?youtube\.com/embed/[\w-]{11}",
     ]
 
     base = url.split("?")[0]
-
     return any(re.match(pattern, base) for pattern in patterns)
 
 
@@ -122,64 +122,47 @@ def get_metadata(request: Request, url: str):
     if not is_valid_youtube_url(url):
         raise InvalidURLError()
 
-    cookiefile = simple_downloader.prepare_cookie_jar()
-
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "nocheckcertificate": True,
-        "socket_timeout": 15,
-        "no_write_cookie_file": True,
-        "cookiesfrombrowser": None,
-        "no_cache_dir": True,
-        "reject_cookies": True,
-        "updating_cache": False,
-    }
-
-    if cookiefile:
-        ydl_opts["cookiefile"] = cookiefile
-        logger.info("Cookies loaded")
-    else:
-        logger.info("Cookies missing")
+    cookiefile, temp_cookie = simple_downloader.acquire_cookiefile()
+    ydl_opts = simple_downloader.build_metadata_opts(cookiefile)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            if not info:
-                raise MetadataError()
-            if info.get("is_live"):
-                raise LiveStreamError()
 
-            supported_formats = simple_downloader.filter_supported_formats(info.get("formats", []))
+        if not info:
+            raise MetadataError()
+        if info.get("is_live"):
+            raise LiveStreamError()
 
-            video_formats = []
-            for entry in supported_formats:
-                video_formats.append(
-                    {
-                        "format_id": entry.get("format_id", ""),
-                        "ext": entry.get("ext"),
-                        "height": entry.get("height"),
-                        "fps": entry.get("fps"),
-                        "filesize": entry.get("filesize") or entry.get("filesize_approx"),
-                        "has_audio": entry.get("acodec", "none") != "none",
-                    }
-                )
+        supported_formats = simple_downloader.filter_supported_formats(info.get("formats", []))
 
-            if not video_formats:
-                if any(f.get("has_drm") for f in info.get("formats", [])):
-                    raise DRMError()
-                logger.error("No MP4 formats found for URL %s", url)
-                raise MetadataError(hint="No downloadable MP4 formats available for this video.")
+        if not supported_formats:
+            if any(f.get("has_drm") for f in info.get("formats", [])):
+                raise DRMError()
+            logger.error("No MP4 formats found for URL %s", url)
+            raise MetadataError(hint="No downloadable MP4 formats available for this video.")
 
-            return {
-                "title": info.get("title"),
-                "channel": info.get("channel") or info.get("uploader"),
-                "thumbnail": info.get("thumbnail"),
-                "duration": info.get("duration"),
-                "video_formats": video_formats,
-                "ffmpeg_available": simple_downloader.is_ffmpeg_available(),
-            }
+        video_formats = []
+        for entry in supported_formats:
+            video_formats.append(
+                {
+                    "format_id": entry.get("format_id", ""),
+                    "ext": entry.get("ext"),
+                    "height": entry.get("height"),
+                    "fps": entry.get("fps"),
+                    "filesize": entry.get("filesize") or entry.get("filesize_approx"),
+                    "has_audio": entry.get("acodec", "none") != "none",
+                }
+            )
+
+        return {
+            "title": info.get("title"),
+            "channel": info.get("channel") or info.get("uploader"),
+            "thumbnail": info.get("thumbnail"),
+            "duration": info.get("duration"),
+            "video_formats": video_formats,
+            "ffmpeg_available": simple_downloader.is_ffmpeg_available(),
+        }
 
     except BaseAPIError:
         raise
@@ -187,7 +170,7 @@ def get_metadata(request: Request, url: str):
         logger.exception("Metadata error for url %s", url)
         raise classify_ytdlp_error(str(exc))
     finally:
-        simple_downloader.cleanup_cookie_jar(cookiefile)
+        simple_downloader.release_cookiefile(temp_cookie)
 
 
 @app.get("/api/download")
