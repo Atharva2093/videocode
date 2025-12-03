@@ -123,6 +123,7 @@ def get_metadata(request: Request, url: str):
         "no_warnings": True,
         "skip_download": True,
         "nocheckcertificate": True,
+        "no_write_cookie_file": True,
         "socket_timeout": 15,
     }
 

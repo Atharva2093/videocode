@@ -81,6 +81,7 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
+        "no_write_cookie_file": True,
         "retries": 10,
         "fragment_retries": 10,
         "file_access_retries": 10,
