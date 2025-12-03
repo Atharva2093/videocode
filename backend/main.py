@@ -119,14 +119,19 @@ def get_metadata(request: Request, url: str):
         raise InvalidURLError()
 
     ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "skip_download": True,
-        "nocheckcertificate": True,
-        "no_write_cookie_file": True,
-        "cookiesfrombrowser": None,
-        "socket_timeout": 15,
-    }
+    "quiet": True,
+    "no_warnings": True,
+    "skip_download": True,
+    "nocheckcertificate": True,
+
+    # ⛔ Block ALL cookie saving
+    "no_write_cookie_file": True,
+    "cookiesfrombrowser": None,
+    "reject_cookies": True,  # <-- ADD THIS (critical)
+
+    "socket_timeout": 15,
+}
+
 
     if os.path.exists(simple_downloader.COOKIES_FILE):
         ydl_opts["cookiefile"] = simple_downloader.COOKIES_FILE

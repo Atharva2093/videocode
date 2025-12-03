@@ -81,8 +81,12 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
+
         "no_write_cookie_file": True,
+        "reject_cookies": True,
         "cookiesfrombrowser": None,
+        "updating_cache": False,
+
         "retries": 10,
         "fragment_retries": 10,
         "file_access_retries": 10,
@@ -98,6 +102,8 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
 
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
+        ydl_opts["updating_cache"] = False
+        ydl_opts["reject_cookies"] = True
         logger.info("Cookies loaded")
     else:
         logger.info("Cookies missing")
@@ -111,6 +117,7 @@ def get_ydl_opts(output_template: str, format_id: str) -> dict:
         ydl_opts.pop("merge_output_format", None)
 
     return ydl_opts
+
 
 
 def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
