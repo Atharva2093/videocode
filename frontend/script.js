@@ -1,16 +1,16 @@
 "use strict";
 
 const isLocalHost = ["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(location.hostname);
-const API = isLocalHost
-  ? "http://127.0.0.1:8000/api"
-  : "https://yt-downloader-backend-ogpx.onrender.com/api";
+const API = isLocalHost ? "http://127.0.0.1:8000/api" : "https://yt-downloader-backend-ogpx.onrender.com/api";
 
-let currentUrl = "";
-let currentTitle = "";
-let currentMetadata = null;
-let selectedFormatId = null;
+const state = {
+  currentUrl: "",
+  currentTitle: "",
+  metadata: null,
+  selectedFormatId: null,
+};
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 const urlInput = $("url");
 const infoDiv = $("info");
 const loading = $("loading");
@@ -23,6 +23,10 @@ const errorBox = $("errorBox");
 const errorMessage = $("errorMessage");
 const errorHint = $("errorHint");
 const successBox = $("successBox");
+const statusBanner = $("statusBanner");
+const statusSpinner = $("statusSpinner");
+const statusIcon = $("statusIcon");
+const statusText = $("statusText");
 const folderModal = $("folderModal");
 const historyDiv = $("history");
 const connectionStatus = $("connectionStatus");
@@ -30,16 +34,51 @@ const toastContainer = $("toastContainer");
 const floatingProgress = $("floatingProgress");
 const floatingProgressText = $("floatingProgressText");
 
+const STATUS_CLASS_MAP = {
+  info: "",
+  preparing: "progress",
+  progress: "progress",
+  success: "success",
+  error: "error",
+};
+
+const STATUS_ICON_MAP = {
+  info: "ℹ️",
+  progress: "⬇️",
+  success: "✅",
+  error: "❌",
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   loadTheme();
   renderHistory();
   checkConnection();
   setInterval(checkConnection, 30000);
-  
-  urlInput.addEventListener("keypress", e => { if (e.key === "Enter") getInfo(); });
-  urlInput.addEventListener("input", hideError);
-  folderModal.addEventListener("click", e => { if (e.target === folderModal) closeFolderModal(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeFolderModal(); });
+
+  urlInput.addEventListener("keypress", (event) => {
+    if (event.key === "Enter") {
+      getInfo();
+    }
+  });
+
+  urlInput.addEventListener("input", () => {
+    hideError();
+    hideStatus();
+  });
+
+  folderModal.addEventListener("click", (event) => {
+    if (event.target === folderModal) {
+      closeFolderModal();
+      setDownloadState("idle");
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeFolderModal();
+      setDownloadState("idle");
+    }
+  });
 });
 
 function loadTheme() {
@@ -63,42 +102,69 @@ function isValidUrl(url) {
     /^(https?:\/\/)?(www\.)?youtube\.com\/watch\?v=[\w-]{11}/,
     /^(https?:\/\/)?(www\.)?youtu\.be\/[\w-]{11}/,
     /^(https?:\/\/)?(www\.)?youtube\.com\/shorts\/[\w-]{11}/,
-    /^(https?:\/\/)?(www\.)?youtube\.com\/embed\/[\w-]{11}/
+    /^(https?:\/\/)?(www\.)?youtube\.com\/embed\/[\w-]{11}/,
   ];
-  return patterns.some(p => p.test(url.trim()));
+  return patterns.some((pattern) => pattern.test(url.trim()));
 }
 
-function showError(msg, hint = "") {
+function showStatus(message, state = "info") {
+  statusBanner.classList.remove("hidden");
+  statusBanner.className = "status-banner";
+  const classSuffix = STATUS_CLASS_MAP[state] || "";
+  if (classSuffix) statusBanner.classList.add(classSuffix);
+
+  statusSpinner.classList.add("hidden");
+  statusIcon.classList.add("hidden");
+
+  if (state === "preparing") {
+    statusSpinner.classList.remove("hidden");
+    statusIcon.classList.add("hidden");
+  } else {
+    const icon = STATUS_ICON_MAP[state] || STATUS_ICON_MAP.info;
+    statusIcon.textContent = icon;
+    statusIcon.classList.remove("hidden");
+  }
+
+  statusText.textContent = message;
+}
+
+function hideStatus() {
+  statusBanner.classList.add("hidden");
+  statusBanner.className = "status-banner";
+}
+
+function showError(message, hint = "") {
   errorBox.classList.remove("hidden");
-  errorMessage.textContent = msg;
+  errorMessage.textContent = message;
   errorHint.textContent = hint;
+  showStatus(message, "error");
   successBox.classList.add("hidden");
 }
 
-function hideError() { errorBox.classList.add("hidden"); }
-
-function showSuccess() {
-  successBox.classList.remove("hidden");
-  setTimeout(() => successBox.classList.add("hidden"), 4000);
+function hideError() {
+  errorBox.classList.add("hidden");
 }
 
-function showToast(msg, type = "info", duration = 3000) {
-  const t = document.createElement("div");
-  t.className = `toast ${type}`;
-  t.innerHTML = `<span>${type === "success" ? "✅" : type === "error" ? "❌" : "⬇️"}</span><span>${msg}</span>`;
-  toastContainer.appendChild(t);
-  setTimeout(() => t.remove(), duration);
+function showToast(message, type = "info", duration = 3500) {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
 }
 
 async function checkConnection() {
   try {
-    const res = await fetch(`${API}/health`);
-    const data = await res.json();
+    const response = await fetch(`${API}/health`, { cache: "no-store" });
+    const data = await response.json();
     if (data.status === "ok") {
       connectionStatus.textContent = "● Connected";
       connectionStatus.className = "status-badge online";
-    } else throw new Error();
-  } catch {
+    } else {
+      throw new Error("Service unavailable");
+    }
+  } catch (error) {
     connectionStatus.textContent = "● Offline";
     connectionStatus.className = "status-badge offline";
   }
@@ -106,192 +172,262 @@ async function checkConnection() {
 
 async function getInfo() {
   hideError();
+  hideStatus();
   successBox.classList.add("hidden");
   infoDiv.innerHTML = "";
   qualitySelector.classList.add("hidden");
+  qualitySelector.innerHTML = "";
   downloadBtn.classList.add("hidden");
-  
+  state.selectedFormatId = null;
+
   const url = urlInput.value.trim();
   if (!url) return showError("Please enter a YouTube URL.");
   if (!isValidUrl(url)) return showError("Invalid YouTube URL.", "Check the format and try again.");
-  
+
   loading.classList.remove("hidden");
-  
+
+  const attempts = 2;
   let data = null;
-  for (let i = 0; i < 2; i++) {
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      const res = await fetch(`${API}/metadata?url=${encodeURIComponent(url)}`);
-      data = await res.json();
-      if (data.error) throw new Error(data.message || "Failed to fetch info");
+      const response = await fetch(`${API}/metadata?url=${encodeURIComponent(url)}`);
+      data = await response.json();
+      if (data?.error) throw new Error(data.message || "Failed to fetch info");
       break;
-    } catch (err) {
-      if (i === 1) {
+    } catch (error) {
+      if (attempt === attempts - 1) {
         loading.classList.add("hidden");
-        return showError(err.message || "Could not fetch video info.", "Check connection or try again.");
+        return showError(error.message || "Could not fetch video info.", "Check your connection or try again.");
       }
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 900));
     }
   }
-  
+
   loading.classList.add("hidden");
-  
-  if (!data?.title) return showError("Could not load video.", "Try a different video.");
-  
-  currentUrl = url;
-  currentTitle = data.title;
-  currentMetadata = data;
-  
-  const dur = data.duration ? `${Math.floor(data.duration/60)}:${String(data.duration%60).padStart(2,"0")}` : "";
-  
-  infoDiv.innerHTML = `
-    <div class="video-card">
-      <img src="${data.thumbnail||""}" alt="" onerror="this.style.display='none'">
-      <div class="video-info">
-        <p class="video-title">${escapeHtml(data.title)}</p>
-        <p class="video-meta">${escapeHtml(data.channel||"")}${dur?" • "+dur:""}</p>
-      </div>
-    </div>`;
-  
+
+  if (!data?.title) return showError("Could not load video metadata.", "Try a different video.");
+
+  state.currentUrl = url;
+  state.currentTitle = data.title;
+  state.metadata = data;
+
+  renderVideoInfo(data);
   renderQualityChips(data.video_formats || []);
   downloadBtn.classList.remove("hidden");
+  showStatus("Ready to download — choose a quality and click Download.", "info");
+}
+
+function renderVideoInfo(info) {
+  const durationLabel = info.duration ? formatDuration(info.duration) : "";
+  const channel = escapeHtml(info.channel || "");
+  const title = escapeHtml(info.title || "");
+  const thumbnail = escapeHtml(info.thumbnail || "");
+
+  infoDiv.innerHTML = `
+    <div class="video-card">
+      <img src="${thumbnail}" alt="Thumbnail" onerror="this.style.display='none'">
+      <div class="video-info">
+        <p class="video-title">${title}</p>
+        <p class="video-meta">${channel}${durationLabel ? ` • ${durationLabel}` : ""}</p>
+      </div>
+    </div>
+  `;
 }
 
 function renderQualityChips(formats) {
-  const map = new Map();
-  formats.forEach(f => {
-    if (!f?.height) return;
-    const key = f.height + "p";
-    const existing = map.get(key);
-    if (!existing || (f.has_audio && !existing.has_audio)) {
-      map.set(key, { format_id: f.format_id, has_audio: f.has_audio });
+  if (!Array.isArray(formats)) formats = [];
+  const mp4Formats = formats.filter((format) => format.ext === "mp4");
+  const grouped = new Map();
+
+  mp4Formats.forEach((format) => {
+    const key = `${format.height || "unknown"}p`;
+    if (!grouped.has(key)) {
+      grouped.set(key, format);
+      return;
+    }
+    const current = grouped.get(key);
+    if (!current.has_audio && format.has_audio) {
+      grouped.set(key, format);
     }
   });
-  
-  const qualities = [...map.keys()].sort((a,b) => parseInt(b) - parseInt(a));
-  
+
+  const qualities = [...grouped.entries()]
+    .filter(([height]) => height !== "unknownp")
+    .sort((a, b) => parseInt(b[0], 10) - parseInt(a[0], 10));
+
+  qualitySelector.innerHTML = "";
+
   if (!qualities.length) {
-    qualitySelector.innerHTML = `<button class="quality-chip active" data-format-id="best">Best</button>`;
-    selectedFormatId = "best";
+    const fallback = document.createElement("button");
+    fallback.className = "quality-chip active";
+    fallback.dataset.formatId = "best";
+    fallback.textContent = "Best Available";
+    fallback.addEventListener("click", () => selectQualityButton(fallback));
+    qualitySelector.appendChild(fallback);
+    state.selectedFormatId = "best";
   } else {
-    const def = qualities.includes("720p") ? "720p" : qualities[0];
-    selectedFormatId = map.get(def)?.format_id || "best";
-    qualitySelector.innerHTML = qualities.map(q => 
-      `<button class="quality-chip ${q===def?"active":""}" data-format-id="${map.get(q).format_id}" onclick="selectQuality(this)">${q}</button>`
-    ).join("");
+    const defaultQuality = qualities.find(([quality]) => quality === "720p") || qualities[0];
+    qualities.forEach(([label, format]) => {
+      const btn = document.createElement("button");
+      btn.className = `quality-chip${label === defaultQuality[0] ? " active" : ""}`;
+      btn.dataset.formatId = format.format_id || "best";
+      btn.textContent = label;
+      btn.addEventListener("click", () => selectQualityButton(btn));
+      qualitySelector.appendChild(btn);
+      if (label === defaultQuality[0]) state.selectedFormatId = format.format_id || "best";
+    });
   }
+
   qualitySelector.classList.remove("hidden");
 }
 
-function selectQuality(el) {
-  document.querySelectorAll(".quality-chip").forEach(c => c.classList.remove("active"));
-  el.classList.add("active");
-  selectedFormatId = el.dataset.formatId;
+function selectQualityButton(button) {
+  document.querySelectorAll(".quality-chip").forEach((chip) => chip.classList.remove("active"));
+  button.classList.add("active");
+  state.selectedFormatId = button.dataset.formatId;
 }
 
 function onDownloadClick() {
   hideError();
-  if (!currentUrl) return showError("No video selected.", "Fetch a video first.");
-  if (!currentMetadata) return showError("Metadata missing.", "Fetch the video again.");
-  if (!selectedFormatId) return showError("No quality selected.");
-  
+  successBox.classList.add("hidden");
+
+  if (!state.currentUrl) return showError("No video selected.", "Fetch a video first.");
+  if (!state.metadata) return showError("Metadata missing.", "Fetch the video again.");
+  if (!state.selectedFormatId) return showError("No quality selected.");
+
   if (typeof window.showDirectoryPicker !== "function") {
     return showError("Browser not supported.", "Use Chrome or Edge.");
   }
-  
+
   folderModal.classList.remove("hidden");
 }
 
-function closeFolderModal() { folderModal.classList.add("hidden"); }
+function closeFolderModal() {
+  folderModal.classList.add("hidden");
+}
 
 async function chooseFolderAndStart() {
   closeFolderModal();
-  
-  let folder;
+  setDownloadState("preparing");
+  showStatus("Waiting for folder selection…", "preparing");
+
+  let folderHandle;
   try {
-    folder = await window.showDirectoryPicker({ mode: "readwrite" });
-  } catch { return; }
-  
-  await downloadToFolder(folder);
+    folderHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+  } catch (error) {
+    hideStatus();
+    setDownloadState("idle");
+    resetProgress();
+    floatingProgress.classList.add("hidden");
+    if (error?.name !== "AbortError") {
+      showToast("Folder selection failed", "error");
+    }
+    return;
+  }
+
+  await downloadToFolder(folderHandle);
 }
 
-async function downloadToFolder(folder) {
+async function downloadToFolder(folderHandle) {
   hideError();
   successBox.classList.add("hidden");
   resetProgress();
-  
-  showToast("Download started…", "info", 2500);
-  setDownloadState("downloading");
+
   floatingProgress.classList.remove("hidden");
   progressContainer.classList.remove("hidden");
-  
+  showStatus("Preparing download…", "preparing");
+  showToast("Preparing download…", "info", 2200);
+
   let writable;
-  let filename;
-  
+  let reader;
+  let response;
+  const folderName = folderHandle?.name || "selected folder";
+
   try {
-    const res = await fetch(`${API}/download?url=${encodeURIComponent(currentUrl)}&format_id=${encodeURIComponent(selectedFormatId)}`);
-    
-    const ct = res.headers.get("Content-Type") || "";
-    if (ct.includes("application/json")) {
-      const err = await res.json();
-      throw new Error(err.message || "Download failed");
+    response = await fetch(`${API}/download?url=${encodeURIComponent(state.currentUrl)}&format_id=${encodeURIComponent(state.selectedFormatId || "best")}`);
+
+    const contentType = response.headers.get("Content-Type") || "";
+    if (contentType.includes("application/json")) {
+      const errorPayload = await response.json();
+      throw new Error(errorPayload.message || "Download failed.");
     }
-    
-    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-    if (!res.body) throw new Error("No data received");
-    
-    const disposition = res.headers.get("Content-Disposition") || "";
-    filename = resolveFilename(disposition, currentTitle);
-    const fileHandle = await folder.getFileHandle(filename, { create: true });
+
+    if (!response.ok) throw new Error(`Server error (${response.status})`);
+    if (!response.body) throw new Error("No data received from server.");
+
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const filename = resolveFilename(disposition, state.currentTitle);
+    const fileHandle = await folderHandle.getFileHandle(filename, { create: true });
     writable = await fileHandle.createWritable();
-    
-    const total = parseInt(res.headers.get("Content-Length") || "0", 10);
-    const reader = res.body.getReader();
+
+    const total = parseInt(response.headers.get("Content-Length") || "0", 10);
+    reader = response.body.getReader();
     let received = 0;
-    
+
+    setDownloadState("downloading");
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       await writable.write(value);
       received += value.length;
-      
-      if (total > 0) {
-        const pct = Math.min(99, Math.round((received / total) * 100));
-        updateProgress(pct);
-      } else {
-        const mb = (received / 1048576).toFixed(1);
-        floatingProgressText.textContent = `${mb} MB`;
-        progressPercent.textContent = `${mb} MB`;
-      }
+      updateProgress(received, total);
     }
-    
+
     await writable.close();
-    
-    updateProgress(100);
-    floatingProgress.classList.add("hidden");
-    setDownloadState("completed");
-    showToast("Download Completed!", "success", 4000);
-    showSuccess();
+    updateProgressComplete(total > 0);
+
+    successBox.innerHTML = `✅ Download complete — saved to: <strong>${escapeHtml(folderName)}</strong>`;
+    successBox.classList.remove("hidden");
+    showStatus(`Download complete — saved to: ${folderName}`, "success");
+    showToast(`Download completed: ${filename}`, "success", 4500);
     playSound();
-    saveToHistory(currentTitle, filename);
-    
-    setTimeout(() => { setDownloadState("idle"); resetProgress(); }, 3000);
-    
-  } catch (err) {
+    saveToHistory(state.currentTitle, filename, folderName);
+
+    setDownloadState("completed");
+    setTimeout(() => {
+      setDownloadState("idle");
+      resetProgress();
+      floatingProgress.classList.add("hidden");
+    }, 2500);
+  } catch (error) {
+    if (reader) {
+      try { reader.cancel(); } catch (_) { /* ignore */ }
+    }
     if (writable) {
-      try { await writable.abort(); } catch (_) {}
+      try { await writable.abort(); } catch (_) { /* ignore */ }
     }
     floatingProgress.classList.add("hidden");
-    setDownloadState("idle");
     progressContainer.classList.add("hidden");
-    showError(err.message || "Download failed.", "Please try again.");
-    showToast("Download failed", "error", 3000);
+    resetProgress();
+    setDownloadState("idle");
+    showStatus(error.message || "Download failed.", "error");
+    showError(error.message || "Download failed.", "Please try again.");
+    showToast("Failed to download video", "error", 4000);
   }
 }
 
-function updateProgress(pct) {
-  progressBar.style.width = pct + "%";
-  progressPercent.textContent = pct + "%";
-  floatingProgressText.textContent = pct + "%";
+function updateProgress(received, total) {
+  if (total > 0) {
+    const percentage = Math.min(99, Math.round((received / total) * 100));
+    progressBar.style.width = `${percentage}%`;
+    progressPercent.textContent = `${percentage}%`;
+    floatingProgressText.textContent = `${percentage}%`;
+    showStatus(`Downloading… ${percentage}%`, "progress");
+  } else {
+    const megabytes = (received / 1048576).toFixed(1);
+    progressBar.style.width = "90%";
+    progressPercent.textContent = `${megabytes} MB`;
+    floatingProgressText.textContent = `${megabytes} MB`;
+    showStatus(`Downloading… ${megabytes} MB`, "progress");
+  }
+}
+
+function updateProgressComplete(hasKnownSize) {
+  progressBar.style.width = "100%";
+  progressPercent.textContent = hasKnownSize ? "100%" : "Done";
+  floatingProgressText.textContent = hasKnownSize ? "100%" : "Done";
 }
 
 function resetProgress() {
@@ -302,19 +438,26 @@ function resetProgress() {
 
 function setDownloadState(state) {
   downloadBtn.classList.remove("downloading", "completed");
-  if (state === "downloading") {
+  if (state === "preparing") {
+    downloadBtn.textContent = "⏳ Preparing…";
     downloadBtn.classList.add("downloading");
-    downloadBtn.textContent = "⏳ Downloading...";
+    downloadBtn.disabled = true;
+  } else if (state === "downloading") {
+    downloadBtn.textContent = "⬇️ Downloading…";
+    downloadBtn.classList.add("downloading");
+    downloadBtn.disabled = true;
   } else if (state === "completed") {
-    downloadBtn.classList.add("completed");
     downloadBtn.textContent = "✅ Downloaded!";
+    downloadBtn.classList.add("completed");
+    downloadBtn.disabled = true;
   } else {
     downloadBtn.textContent = "⬇️ Download MP4";
+    downloadBtn.disabled = false;
   }
 }
 
-function resolveFilename(disposition, fallbackTitle) {
-  const fallback = sanitizeFilename(fallbackTitle) + ".mp4";
+function resolveFilename(disposition, title) {
+  const fallback = `${sanitizeForFilename(title)}.mp4`;
   if (!disposition) return fallback;
   const match = /filename="?([^";]+)"?/i.exec(disposition);
   if (!match) return fallback;
@@ -327,46 +470,65 @@ function resolveFilename(disposition, fallbackTitle) {
     base = raw.slice(0, lastDot);
     ext = raw.slice(lastDot + 1);
   }
-  const cleanBase = sanitizeFilename(base);
-  const cleanExt = (ext || "mp4").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-  if (!cleanBase) return fallback;
-  return `${cleanBase}.${cleanExt || "mp4"}`;
+  const cleanBase = sanitizeForFilename(base);
+  const cleanExt = sanitizeForFilename(ext).toLowerCase() || "mp4";
+  return `${cleanBase}.${cleanExt}`;
 }
 
-function sanitizeFilename(name) {
+function sanitizeForFilename(name) {
   if (!name) return "video";
   return name.replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, " ").trim().substring(0, 150) || "video";
 }
 
 function escapeHtml(text) {
-  if (!text) return "";
-  const d = document.createElement("div");
-  d.textContent = text;
-  return d.innerHTML;
+  const element = document.createElement("div");
+  element.textContent = text ?? "";
+  return element.innerHTML;
+}
+
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = String(seconds % 60).padStart(2, "0");
+  return `${mins}:${secs}`;
 }
 
 function playSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = context.createOscillator();
+    const gain = context.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  } catch {}
+    gain.connect(context.destination);
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(880, context.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1320, context.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.12, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.25);
+    osc.start();
+    osc.stop(context.currentTime + 0.25);
+  } catch (_) {
+    /* ignore */
+  }
 }
 
-function saveToHistory(title, filename) {
+function saveToHistory(title, filename, folderName) {
   const history = JSON.parse(localStorage.getItem("downloadHistory") || "[]");
-  if (history.some(h => h.file === filename)) return;
-  history.unshift({ name: title.substring(0, 80), file: filename, time: new Date().toLocaleString() });
-  while (history.length > 10) history.pop();
-  localStorage.setItem("downloadHistory", JSON.stringify(history));
+  const entry = {
+    name: (title || filename || "Video").substring(0, 80),
+    file: filename,
+    folder: folderName,
+    time: new Date().toLocaleString(),
+  };
+  history.unshift(entry);
+  const unique = [];
+  const seen = new Set();
+  history.forEach((item) => {
+    if (seen.has(item.file)) return;
+    seen.add(item.file);
+    unique.push(item);
+  });
+  while (unique.length > 10) unique.pop();
+  localStorage.setItem("downloadHistory", JSON.stringify(unique));
   renderHistory();
 }
 
@@ -376,14 +538,20 @@ function renderHistory() {
     historyDiv.innerHTML = '<div class="history-item">No downloads yet</div>';
     return;
   }
-  historyDiv.innerHTML = history.map(h => 
-    `<div class="history-item"><strong>${escapeHtml(h.name)}</strong><small>${escapeHtml(h.file)} • ${h.time}</small></div>`
-  ).join("");
+
+  historyDiv.innerHTML = history
+    .map((item) => `
+      <div class="history-item">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(item.file)} • ${escapeHtml(item.folder || "folder")} • ${item.time}</small>
+      </div>
+    `)
+    .join("");
 }
 
 window.toggleTheme = toggleTheme;
 window.getInfo = getInfo;
-window.selectQuality = selectQuality;
+window.selectQuality = selectQualityButton;
 window.onDownloadClick = onDownloadClick;
 window.chooseFolderAndStart = chooseFolderAndStart;
 window.closeFolderModal = closeFolderModal;

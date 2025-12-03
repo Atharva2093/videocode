@@ -117,6 +117,42 @@ header h1 { font-size: 20px; font-weight: 600; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.status-banner {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow);
+}
+
+.status-banner.success { border-left: 3px solid var(--success); }
+.status-banner.error { border-left: 3px solid var(--error); }
+.status-banner.progress { border-left: 3px solid var(--accent); }
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.status-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.6s linear infinite;
+}
+
+.status-icon { font-size: 16px; }
+.status-text { font-size: 13px; color: var(--text); flex: 1; }
+
 .quality-selector { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
 
 .quality-chip {
@@ -165,10 +201,10 @@ header h1 { font-size: 20px; font-weight: 600; }
 .video-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
 .progress {
-  height: 8px;
-  background: var(--border);
-  border-radius: 4px;
-  margin-top: 16px;
+  height: 10px;
+  background: rgba(148,163,184,0.2);
+  border-radius: 999px;
+  margin-top: 18px;
   position: relative;
   overflow: hidden;
 }
@@ -176,15 +212,15 @@ header h1 { font-size: 20px; font-weight: 600; }
 #progressBar {
   width: 0%;
   height: 100%;
-  background: var(--accent);
-  border-radius: 4px;
-  transition: width 0.1s;
+  background: linear-gradient(90deg, var(--accent), #60a5fa);
+  border-radius: 999px;
+  transition: width 0.25s ease;
 }
 
 #progressPercent {
   position: absolute;
-  right: 0;
-  top: 14px;
+  right: 12px;
+  top: -22px;
   font-size: 12px;
   color: var(--muted);
 }

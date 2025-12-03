@@ -26,6 +26,14 @@
         <p id="errorHint" class="error-hint"></p>
       </div>
 
+      <div id="statusBanner" class="status-banner hidden" role="status">
+        <div class="status-indicator">
+          <div id="statusSpinner" class="status-spinner hidden" aria-hidden="true"></div>
+          <span id="statusIcon" class="status-icon hidden" aria-hidden="true">⬇️</span>
+        </div>
+        <p id="statusText" class="status-text">Preparing download…</p>
+      </div>
+
       <div id="info"></div>
       <div id="qualitySelector" class="quality-selector hidden"></div>
 
@@ -33,7 +41,7 @@
         ⬇️ Download MP4
       </button>
 
-      <div id="progressContainer" class="progress hidden">
+      <div id="progressContainer" class="progress hidden" aria-live="polite">
         <div id="progressBar"></div>
         <span id="progressPercent">0%</span>
       </div>

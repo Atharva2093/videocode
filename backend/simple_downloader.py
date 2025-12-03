@@ -1,22 +1,30 @@
-import yt_dlp
+import logging
 import os
 import re
-import uuid
 import shutil
+import tempfile
 import time
-import logging
+from dataclasses import dataclass
+from typing import Optional
+
+import yt_dlp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-DOWNLOADS_DIR = os.path.join(BACKEND_DIR, "downloads")
 COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
 
 if os.path.exists("/etc/secrets/cookies.txt"):
     COOKIES_FILE = "/etc/secrets/cookies.txt"
 
-os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+
+@dataclass
+class DownloadArtifact:
+    filepath: str
+    filename: str
+    filesize: Optional[int]
+    workspace: str
 
 
 def is_ffmpeg_available() -> bool:
@@ -31,18 +39,24 @@ def get_yt_dlp_version() -> str:
     return yt_dlp.version.__version__
 
 
-def sanitize_title(title: str) -> str:
+def sanitize_title(title: Optional[str]) -> str:
     if not title:
         return "video"
-    safe = re.sub(r'[\\/:*?"<>|]', '', title)
-    safe = re.sub(r'\s+', ' ', safe).strip()
+    safe = re.sub(r'[\\/:*?"<>|]', "", title)
+    safe = re.sub(r"\s+", " ", safe).strip()
     return safe[:150] if safe else "video"
 
 
-def download(url: str, format_id: str = "best", title: str = None) -> tuple[str, str]:
-    file_id = str(uuid.uuid4())
-    output_template = os.path.join(DOWNLOADS_DIR, f"{file_id}.%(ext)s")
-    
+def _build_format_selector(format_id: str) -> str:
+    if format_id and format_id != "best":
+        return f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
+    return "bestvideo+bestaudio/best"
+
+
+def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
+    workspace = tempfile.mkdtemp(prefix="yt-stream-")
+    output_template = os.path.join(workspace, "video.%(ext)s")
+
     ydl_opts = {
         "outtmpl": output_template,
         "quiet": True,
@@ -51,75 +65,93 @@ def download(url: str, format_id: str = "best", title: str = None) -> tuple[str,
         "retries": 5,
         "fragment_retries": 5,
         "socket_timeout": 30,
+        "noprogress": True,
+        "format": _build_format_selector(format_id),
+        "merge_output_format": "mp4",
     }
-    
+
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
-        logger.info("Using cookies file")
-    
+        logger.info("Using cookies file for download")
+
     if is_ffmpeg_available():
         ydl_opts["ffmpeg_location"] = get_ffmpeg_location()
-        # With FFmpeg: can merge separate video+audio streams
-        if format_id and format_id != "best":
-            ydl_opts["format"] = f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
-        else:
-            ydl_opts["format"] = "bestvideo+bestaudio/best"
-        ydl_opts["merge_output_format"] = "mp4"
     else:
-        # Without FFmpeg: must use pre-merged formats only
-        logger.warning("FFmpeg not available - using pre-merged formats only")
-        if format_id and format_id != "best":
-            # Try the format, fallback to best single file
-            ydl_opts["format"] = f"{format_id}/best[ext=mp4]/best"
-        else:
-            ydl_opts["format"] = "best[ext=mp4]/best"
-    
-    logger.info(f"Starting download: {url[:50]}... format={format_id}")
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        if not info:
-            raise Exception("Failed to extract video info")
-        if info.get("is_live"):
-            raise Exception("Live streams cannot be downloaded")
-        
-        video_title = title or info.get("title") or "video"
-    
-    for filename in os.listdir(DOWNLOADS_DIR):
-        if filename.startswith(file_id):
-            filepath = os.path.join(DOWNLOADS_DIR, filename)
-            if os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-                ext = os.path.splitext(filename)[1]
-                safe_title = sanitize_title(video_title)
-                final_name = f"{safe_title}{ext}"
-                logger.info(f"Download complete: {final_name}")
-                return filepath, final_name
-    
-    raise Exception("Download completed but file not found")
+        logger.warning("FFmpeg not available - falling back to progressive formats only")
+        preferred = format_id if format_id and format_id != "best" else "best"
+        ydl_opts["format"] = f"{preferred}[ext=mp4]/best[ext=mp4]/best"
+        ydl_opts.pop("merge_output_format", None)
 
+    logger.info("Preparing download workspace at %s", workspace)
 
-def cleanup_file(filepath: str):
     try:
-        if filepath and os.path.exists(filepath):
-            os.remove(filepath)
-            logger.info(f"Cleaned up: {filepath}")
-    except Exception as e:
-        logger.warning(f"Cleanup failed: {e}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if not info:
+                raise RuntimeError("Failed to extract video info")
+            if info.get("is_live"):
+                raise RuntimeError("Live streams cannot be downloaded")
+
+            requested = info.get("requested_downloads") or []
+            candidate_path = None
+            if requested:
+                candidate_path = requested[0].get("filepath")
+            if not candidate_path:
+                candidate_path = info.get("_filename")
+            if not candidate_path or not os.path.exists(candidate_path):
+                for entry in os.listdir(workspace):
+                    test_path = os.path.join(workspace, entry)
+                    if os.path.isfile(test_path):
+                        candidate_path = test_path
+                        break
+
+            if not candidate_path or not os.path.exists(candidate_path):
+                raise RuntimeError("Download produced no file")
+
+            ext = os.path.splitext(candidate_path)[1] or ".mp4"
+            safe_title = sanitize_title(info.get("title"))
+            final_name = f"{safe_title}{ext}"
+            final_path = os.path.join(workspace, final_name)
+
+            if candidate_path != final_path:
+                shutil.move(candidate_path, final_path)
+
+            filesize = os.path.getsize(final_path) if os.path.exists(final_path) else None
+            logger.info("Prepared artifact %s (%s bytes)", final_name, filesize or "unknown")
+
+            return DownloadArtifact(
+                filepath=final_path,
+                filename=final_name,
+                filesize=filesize,
+                workspace=workspace,
+            )
+    except Exception:
+        shutil.rmtree(workspace, ignore_errors=True)
+        raise
 
 
-def cleanup_old_downloads(max_age_hours: int = 1):
+def cleanup_artifact(artifact: DownloadArtifact) -> None:
+    try:
+        shutil.rmtree(artifact.workspace, ignore_errors=True)
+        logger.info("Cleaned up workspace %s", artifact.workspace)
+    except Exception as exc:
+        logger.warning("Failed to clean workspace %s: %s", artifact.workspace, exc)
+
+
+def cleanup_stale_workspaces(max_age_hours: int = 6) -> None:
     now = time.time()
     max_age = max_age_hours * 3600
-    count = 0
-    
-    try:
-        for filename in os.listdir(DOWNLOADS_DIR):
-            filepath = os.path.join(DOWNLOADS_DIR, filename)
-            if os.path.isfile(filepath):
-                if now - os.path.getmtime(filepath) > max_age:
-                    os.remove(filepath)
-                    count += 1
-        if count:
-            logger.info(f"Cleaned up {count} old files")
-    except Exception as e:
-        logger.warning(f"Old file cleanup failed: {e}")
+    tmp_dir = tempfile.gettempdir()
+    removed = 0
+    for entry in os.listdir(tmp_dir):
+        if not entry.startswith("yt-stream-"):
+            continue
+        path = os.path.join(tmp_dir, entry)
+        try:
+            if os.path.isdir(path) and now - os.path.getmtime(path) > max_age:
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+        except Exception:
+            continue
+    if removed:
+        logger.info("Removed %s stale workspaces", removed)

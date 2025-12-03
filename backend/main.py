@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from slowapi import Limiter
@@ -65,7 +65,7 @@ async def startup():
     logger.info(f"yt-dlp version: {simple_downloader.get_yt_dlp_version()}")
     logger.info(f"FFmpeg: {simple_downloader.get_ffmpeg_location()}")
     logger.info(f"Cookies: {'Found' if os.path.exists(simple_downloader.COOKIES_FILE) else 'Not found'}")
-    simple_downloader.cleanup_old_downloads(max_age_hours=1)
+    simple_downloader.cleanup_stale_workspaces(max_age_hours=6)
     logger.info("=" * 50)
 
 
@@ -171,43 +171,48 @@ def download_video(request: Request, url: str, format_id: str = "best"):
     if format_id and not re.match(r'^[a-zA-Z0-9_+-]+$', format_id):
         raise InvalidURLError(message="Invalid format ID.")
     
-    filepath = None
+    artifact = None
     
     try:
-        filepath, filename = simple_downloader.download(url, format_id)
-        
-        if not filepath or not os.path.exists(filepath):
-            raise DownloadError(message="File not found after download.")
-        
-        filesize = os.path.getsize(filepath)
-        logger.info(f"Streaming {filename} ({filesize} bytes)")
-        
-        def stream():
-            nonlocal filepath
-            try:
-                with open(filepath, "rb") as f:
-                    while chunk := f.read(1024 * 1024):
-                        yield chunk
-            finally:
-                simple_downloader.cleanup_file(filepath)
-        
-        safe_filename = filename.replace('"', "'")
-        
-        return StreamingResponse(
-            stream(),
-            media_type="video/mp4",
-            headers={
-                "Content-Disposition": f'attachment; filename="{safe_filename}"',
-                "Content-Length": str(filesize)
-            }
+        artifact = simple_downloader.prepare_download(url, format_id)
+
+        if not artifact.filepath or not os.path.exists(artifact.filepath):
+            raise DownloadError(message="File not found after preparation.")
+
+        logger.info(
+            "Streaming %s (%s bytes)",
+            artifact.filename,
+            artifact.filesize or "unknown"
         )
-    
+
+        def stream_file(path: str):
+            with open(path, "rb") as file_handle:
+                while chunk := file_handle.read(1024 * 1024):
+                    yield chunk
+
+        safe_filename = artifact.filename.replace('"', "'")
+        headers = {
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
+        }
+        if artifact.filesize is not None:
+            headers["Content-Length"] = str(artifact.filesize)
+
+        background = BackgroundTasks()
+        background.add_task(simple_downloader.cleanup_artifact, artifact)
+
+        return StreamingResponse(
+            stream_file(artifact.filepath),
+            media_type="video/mp4",
+            headers=headers,
+            background=background,
+        )
+
     except BaseAPIError:
-        if filepath:
-            simple_downloader.cleanup_file(filepath)
+        if artifact:
+            simple_downloader.cleanup_artifact(artifact)
         raise
     except Exception as e:
-        if filepath:
-            simple_downloader.cleanup_file(filepath)
+        if artifact:
+            simple_downloader.cleanup_artifact(artifact)
         logger.error(f"Download error: {e}")
         raise classify_ytdlp_error(str(e))
