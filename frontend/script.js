@@ -8,6 +8,7 @@ const state = {
   currentTitle: "",
   metadata: null,
   selectedFormatId: null,
+  unknownProgress: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -107,21 +108,19 @@ function isValidUrl(url) {
   return patterns.some((pattern) => pattern.test(url.trim()));
 }
 
-function showStatus(message, state = "info") {
+function showStatus(message, mode = "info") {
   statusBanner.classList.remove("hidden");
   statusBanner.className = "status-banner";
-  const classSuffix = STATUS_CLASS_MAP[state] || "";
+  const classSuffix = STATUS_CLASS_MAP[mode] || "";
   if (classSuffix) statusBanner.classList.add(classSuffix);
 
   statusSpinner.classList.add("hidden");
   statusIcon.classList.add("hidden");
 
-  if (state === "preparing") {
+  if (mode === "preparing") {
     statusSpinner.classList.remove("hidden");
-    statusIcon.classList.add("hidden");
   } else {
-    const icon = STATUS_ICON_MAP[state] || STATUS_ICON_MAP.info;
-    statusIcon.textContent = icon;
+    statusIcon.textContent = STATUS_ICON_MAP[mode] || STATUS_ICON_MAP.info;
     statusIcon.classList.remove("hidden");
   }
 
@@ -148,10 +147,24 @@ function hideError() {
 function showToast(message, type = "info", duration = 3500) {
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
-  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
-  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+  toast.setAttribute("role", type === "error" ? "alert" : "status");
+  toast.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+
+  const icon = type === "success" ? "✅" : type === "error" ? "⚠️" : "ℹ️";
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-message">${message}</span>`;
+  toast.style.setProperty("--toast-duration", `${duration}ms`);
   toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), duration);
+
+  const dismiss = () => {
+    toast.classList.add("leaving");
+    setTimeout(() => toast.remove(), 220);
+  };
+
+  const timer = setTimeout(dismiss, duration);
+  toast.addEventListener("click", () => {
+    clearTimeout(timer);
+    dismiss();
+  }, { once: true });
 }
 
 async function checkConnection() {
@@ -164,7 +177,7 @@ async function checkConnection() {
     } else {
       throw new Error("Service unavailable");
     }
-  } catch (error) {
+  } catch (_) {
     connectionStatus.textContent = "● Offline";
     connectionStatus.className = "status-badge offline";
   }
@@ -215,7 +228,7 @@ async function getInfo() {
   renderVideoInfo(data);
   renderQualityChips(data.video_formats || []);
   downloadBtn.classList.remove("hidden");
-  showStatus("Ready to download — choose a quality and click Download.", "info");
+  showStatus("Ready to download — choose a quality.", "info");
 }
 
 function renderVideoInfo(info) {
@@ -223,37 +236,44 @@ function renderVideoInfo(info) {
   const channel = escapeHtml(info.channel || "");
   const title = escapeHtml(info.title || "");
   const thumbnail = escapeHtml(info.thumbnail || "");
+  const metaSegments = [];
+
+  if (channel) metaSegments.push(`<span>${channel}</span>`);
+  if (durationLabel) metaSegments.push(`<span>${durationLabel}</span>`);
+
+  const metaHtml = metaSegments.length
+    ? `<div class="video-meta">${metaSegments.join('<span class="video-meta-sep" aria-hidden="true">•</span>')}</div>`
+    : "";
 
   infoDiv.innerHTML = `
     <div class="video-card">
       <img src="${thumbnail}" alt="Thumbnail" onerror="this.style.display='none'">
       <div class="video-info">
         <p class="video-title">${title}</p>
-        <p class="video-meta">${channel}${durationLabel ? ` • ${durationLabel}` : ""}</p>
+        ${metaHtml}
       </div>
     </div>
   `;
 }
 
 function renderQualityChips(formats) {
-  if (!Array.isArray(formats)) formats = [];
-  const mp4Formats = formats.filter((format) => format.ext === "mp4");
+  const mp4Formats = (formats || []).filter((format) => format.ext === "mp4");
   const grouped = new Map();
 
   mp4Formats.forEach((format) => {
-    const key = `${format.height || "unknown"}p`;
-    if (!grouped.has(key)) {
-      grouped.set(key, format);
+    const label = `${format.height || ""}p`;
+    if (!grouped.has(label)) {
+      grouped.set(label, format);
       return;
     }
-    const current = grouped.get(key);
+    const current = grouped.get(label);
     if (!current.has_audio && format.has_audio) {
-      grouped.set(key, format);
+      grouped.set(label, format);
     }
   });
 
   const qualities = [...grouped.entries()]
-    .filter(([height]) => height !== "unknownp")
+    .filter(([label]) => label.trim().length)
     .sort((a, b) => parseInt(b[0], 10) - parseInt(a[0], 10));
 
   qualitySelector.innerHTML = "";
@@ -267,7 +287,7 @@ function renderQualityChips(formats) {
     qualitySelector.appendChild(fallback);
     state.selectedFormatId = "best";
   } else {
-    const defaultQuality = qualities.find(([quality]) => quality === "720p") || qualities[0];
+    const defaultQuality = qualities.find(([label]) => label === "720p") || qualities[0];
     qualities.forEach(([label, format]) => {
       const btn = document.createElement("button");
       btn.className = `quality-chip${label === defaultQuality[0] ? " active" : ""}`;
@@ -322,6 +342,8 @@ async function chooseFolderAndStart() {
     floatingProgress.classList.add("hidden");
     if (error?.name !== "AbortError") {
       showToast("Folder selection failed", "error");
+    } else {
+      showToast("Download cancelled", "info");
     }
     return;
   }
@@ -331,9 +353,9 @@ async function chooseFolderAndStart() {
 
 async function downloadToFolder(folderHandle) {
   hideError();
+  hideStatus();
   successBox.classList.add("hidden");
   resetProgress();
-
   floatingProgress.classList.remove("hidden");
   progressContainer.classList.remove("hidden");
   showStatus("Preparing download…", "preparing");
@@ -345,7 +367,9 @@ async function downloadToFolder(folderHandle) {
   const folderName = folderHandle?.name || "selected folder";
 
   try {
-    response = await fetch(`${API}/download?url=${encodeURIComponent(state.currentUrl)}&format_id=${encodeURIComponent(state.selectedFormatId || "best")}`);
+    response = await fetch(
+      `${API}/download?url=${encodeURIComponent(state.currentUrl)}&format_id=${encodeURIComponent(state.selectedFormatId || "best")}`,
+    );
 
     const contentType = response.headers.get("Content-Type") || "";
     if (contentType.includes("application/json")) {
@@ -366,6 +390,7 @@ async function downloadToFolder(folderHandle) {
     let received = 0;
 
     setDownloadState("downloading");
+    showStatus("Downloading… 0%", "progress");
 
     while (true) {
       const { done, value } = await reader.read();
@@ -378,33 +403,42 @@ async function downloadToFolder(folderHandle) {
     await writable.close();
     updateProgressComplete(total > 0);
 
-    successBox.innerHTML = `✅ Download complete — saved to: <strong>${escapeHtml(folderName)}</strong>`;
+    const folderLabel = escapeHtml(folderName);
+    successBox.innerHTML = `✅ Download complete — saved to: <strong>${folderLabel}</strong>`;
     successBox.classList.remove("hidden");
     showStatus(`Download complete — saved to: ${folderName}`, "success");
     showToast(`Download completed: ${filename}`, "success", 4500);
     playSound();
     saveToHistory(state.currentTitle, filename, folderName);
-
     setDownloadState("completed");
+
     setTimeout(() => {
       setDownloadState("idle");
       resetProgress();
       floatingProgress.classList.add("hidden");
-    }, 2500);
+      hideStatus();
+    }, 2800);
   } catch (error) {
     if (reader) {
-      try { reader.cancel(); } catch (_) { /* ignore */ }
+      try {
+        await reader.cancel();
+      } catch (_) {
+        /* ignore */
+      }
     }
     if (writable) {
-      try { await writable.abort(); } catch (_) { /* ignore */ }
+      try {
+        await writable.abort();
+      } catch (_) {
+        /* ignore */
+      }
     }
     floatingProgress.classList.add("hidden");
     progressContainer.classList.add("hidden");
-    resetProgress();
     setDownloadState("idle");
     showStatus(error.message || "Download failed.", "error");
     showError(error.message || "Download failed.", "Please try again.");
-    showToast("Failed to download video", "error", 4000);
+    showToast("Failed to download video", "error", 4200);
   }
 }
 
@@ -416,8 +450,9 @@ function updateProgress(received, total) {
     floatingProgressText.textContent = `${percentage}%`;
     showStatus(`Downloading… ${percentage}%`, "progress");
   } else {
+    state.unknownProgress = Math.min(95, (state.unknownProgress || 10) + 2);
     const megabytes = (received / 1048576).toFixed(1);
-    progressBar.style.width = "90%";
+    progressBar.style.width = `${state.unknownProgress}%`;
     progressPercent.textContent = `${megabytes} MB`;
     floatingProgressText.textContent = `${megabytes} MB`;
     showStatus(`Downloading… ${megabytes} MB`, "progress");
@@ -431,22 +466,23 @@ function updateProgressComplete(hasKnownSize) {
 }
 
 function resetProgress() {
+  state.unknownProgress = 0;
   progressBar.style.width = "0%";
   progressPercent.textContent = "0%";
   progressContainer.classList.add("hidden");
 }
 
-function setDownloadState(state) {
+function setDownloadState(mode) {
   downloadBtn.classList.remove("downloading", "completed");
-  if (state === "preparing") {
+  if (mode === "preparing") {
     downloadBtn.textContent = "⏳ Preparing…";
     downloadBtn.classList.add("downloading");
     downloadBtn.disabled = true;
-  } else if (state === "downloading") {
+  } else if (mode === "downloading") {
     downloadBtn.textContent = "⬇️ Downloading…";
     downloadBtn.classList.add("downloading");
     downloadBtn.disabled = true;
-  } else if (state === "completed") {
+  } else if (mode === "completed") {
     downloadBtn.textContent = "✅ Downloaded!";
     downloadBtn.classList.add("completed");
     downloadBtn.disabled = true;
@@ -465,14 +501,11 @@ function resolveFilename(disposition, title) {
   if (!raw) return fallback;
   const lastDot = raw.lastIndexOf(".");
   let base = raw;
-  let ext = "mp4";
-  if (lastDot > 0 && lastDot < raw.length - 1) {
+  if (lastDot > 0) {
     base = raw.slice(0, lastDot);
-    ext = raw.slice(lastDot + 1);
   }
   const cleanBase = sanitizeForFilename(base);
-  const cleanExt = sanitizeForFilename(ext).toLowerCase() || "mp4";
-  return `${cleanBase}.${cleanExt}`;
+  return `${cleanBase}.mp4`;
 }
 
 function sanitizeForFilename(name) {
@@ -507,7 +540,7 @@ function playSound() {
     osc.start();
     osc.stop(context.currentTime + 0.25);
   } catch (_) {
-    /* ignore */
+    /* ignore audio errors */
   }
 }
 
@@ -520,6 +553,7 @@ function saveToHistory(title, filename, folderName) {
     time: new Date().toLocaleString(),
   };
   history.unshift(entry);
+
   const unique = [];
   const seen = new Set();
   history.forEach((item) => {
@@ -528,6 +562,7 @@ function saveToHistory(title, filename, folderName) {
     unique.push(item);
   });
   while (unique.length > 10) unique.pop();
+
   localStorage.setItem("downloadHistory", JSON.stringify(unique));
   renderHistory();
 }
@@ -540,18 +575,19 @@ function renderHistory() {
   }
 
   historyDiv.innerHTML = history
-    .map((item) => `
+    .map(
+      (item) => `
       <div class="history-item">
         <strong>${escapeHtml(item.name)}</strong>
         <small>${escapeHtml(item.file)} • ${escapeHtml(item.folder || "folder")} • ${item.time}</small>
       </div>
-    `)
+    `,
+    )
     .join("");
 }
 
 window.toggleTheme = toggleTheme;
 window.getInfo = getInfo;
-window.selectQuality = selectQualityButton;
 window.onDownloadClick = onDownloadClick;
 window.chooseFolderAndStart = chooseFolderAndStart;
 window.closeFolderModal = closeFolderModal;

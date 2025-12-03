@@ -4,77 +4,118 @@
   <meta charset="UTF-8">
   <title>YouTube Downloader</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Download YouTube videos as MP4">
+  <meta name="description" content="Download YouTube videos as MP4 files.">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📹</text></svg>">
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>📹 YouTube Downloader</h1>
+    <header class="app-header">
+      <div class="header-copy">
+        <span class="eyebrow">Private · Fast · MP4 ready</span>
+        <h1>📹 YouTube Downloader</h1>
+        <p class="subtitle">Stream MP4 downloads directly into your folders with real-time progress.</p>
+      </div>
       <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">🌙</button>
     </header>
 
-    <div class="card">
-      <input id="url" class="input" type="url" placeholder="Paste YouTube URL here" autocomplete="off">
-      <button class="btn primary" onclick="getInfo()">Fetch Video</button>
-
-      <div id="loading" class="spinner hidden"></div>
-
-      <div id="errorBox" class="error-box hidden">
-        <p id="errorMessage" class="error-message"></p>
-        <p id="errorHint" class="error-hint"></p>
-      </div>
-
-      <div id="statusBanner" class="status-banner hidden" role="status">
-        <div class="status-indicator">
-          <div id="statusSpinner" class="status-spinner hidden" aria-hidden="true"></div>
-          <span id="statusIcon" class="status-icon hidden" aria-hidden="true">⬇️</span>
+    <main class="main-grid">
+      <section class="card card--download" aria-labelledby="downloadTitle">
+        <div class="card-header">
+          <div>
+            <h2 id="downloadTitle">Download</h2>
+            <p class="card-subtitle">Paste a YouTube link, choose a quality, then save it straight to your device.</p>
+          </div>
         </div>
-        <p id="statusText" class="status-text">Preparing download…</p>
-      </div>
 
-      <div id="info"></div>
-      <div id="qualitySelector" class="quality-selector hidden"></div>
+        <div class="field-stack">
+          <label for="url" class="field-label">YouTube URL</label>
+          <div class="field-row">
+            <input id="url" class="input" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
+            <button class="btn primary btn-inline" onclick="getInfo()">Fetch Video</button>
+          </div>
+        </div>
 
-      <button id="downloadBtn" class="btn primary download-btn hidden" onclick="onDownloadClick()">
-        ⬇️ Download MP4
-      </button>
+        <div id="loading" class="spinner hidden" role="status" aria-live="polite" aria-label="Loading"></div>
 
-      <div id="progressContainer" class="progress hidden" aria-live="polite">
-        <div id="progressBar"></div>
-        <span id="progressPercent">0%</span>
-      </div>
+        <div id="errorBox" class="error-box hidden" role="alert">
+          <p id="errorMessage" class="error-message"></p>
+          <p id="errorHint" class="error-hint"></p>
+        </div>
 
-      <div id="successBox" class="success-box hidden">
-        ✅ Download complete!
-      </div>
-    </div>
+        <div id="statusBanner" class="status-banner hidden" role="status">
+          <div class="status-indicator">
+            <div id="statusSpinner" class="status-spinner hidden" aria-hidden="true"></div>
+            <span id="statusIcon" class="status-icon hidden" aria-hidden="true">⬇️</span>
+          </div>
+          <p id="statusText" class="status-text">Preparing download…</p>
+        </div>
 
-    <h3 class="section-title">Recent Downloads</h3>
-    <div id="history" class="history"></div>
+        <div id="info" class="video-wrapper"></div>
+
+        <div class="quality-block">
+          <div class="block-heading">
+            <h3>Quality</h3>
+            <span class="hint">Best options first</span>
+          </div>
+          <div id="qualitySelector" class="quality-selector hidden" role="radiogroup" aria-label="Available qualities"></div>
+        </div>
+
+        <button id="downloadBtn" class="btn primary download-btn hidden" onclick="onDownloadClick()">⬇️ Download MP4</button>
+
+        <div id="progressContainer" class="progress-shell hidden" aria-live="polite">
+          <div class="progress">
+            <div id="progressBar"></div>
+          </div>
+          <span id="progressPercent" class="progress-label">0%</span>
+        </div>
+
+        <div id="successBox" class="success-box hidden" role="status">
+          ✅ Download complete!
+        </div>
+      </section>
+
+      <section class="card card--history" aria-labelledby="historyTitle">
+        <div class="card-header">
+          <div>
+            <h2 id="historyTitle">Recent Downloads</h2>
+            <p class="card-subtitle">Your last 10 saves stay on this device.</p>
+          </div>
+        </div>
+        <div id="history" class="history"></div>
+      </section>
+    </main>
 
     <footer class="footer">
-      <span id="connectionStatus" class="status-badge offline">● Checking...</span>
+      <span id="connectionStatus" class="status-badge offline" aria-live="polite">● Checking…</span>
+      <span class="footer-note">Streaming happens locally — nothing is stored on the server.</span>
     </footer>
   </div>
 
   <div id="folderModal" class="modal hidden" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true">
-      <h3>📁 Select Save Location</h3>
-      <p>Choose where to save the video file.</p>
+      <header class="modal-header">
+        <div class="modal-icon">📁</div>
+        <div>
+          <h3>Select Save Location</h3>
+          <p>Pick a folder to store the MP4 download.</p>
+        </div>
+      </header>
+      <div class="modal-body">
+        <p>All files stay on your machine. You can change the folder anytime.</p>
+      </div>
       <div class="modal-actions">
         <button class="btn primary" onclick="chooseFolderAndStart()">📂 Select Folder</button>
         <button class="btn secondary" onclick="closeFolderModal()">Cancel</button>
       </div>
-      <p class="modal-note">Requires Chrome or Edge</p>
+      <p class="modal-note">Requires Chrome or Edge.</p>
     </div>
   </div>
 
-  <div id="toastContainer"></div>
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
-  <div id="floatingProgress" class="floating-progress hidden">
-    <span>⬇️</span>
+  <div id="floatingProgress" class="floating-progress hidden" role="status" aria-live="polite">
+    <span class="floating-icon">⬇️</span>
     <span id="floatingProgressText">0%</span>
   </div>
 

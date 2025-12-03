@@ -9,8 +9,9 @@ from typing import Optional
 
 import yt_dlp
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
@@ -47,6 +48,27 @@ def sanitize_title(title: Optional[str]) -> str:
     return safe[:150] if safe else "video"
 
 
+def cleanup_stale_workspaces(max_age_hours: int = 6) -> None:
+    tmp_dir = tempfile.gettempdir()
+    now = time.time()
+    max_age = max_age_hours * 3600
+    removed = 0
+
+    for name in os.listdir(tmp_dir):
+        if not name.startswith("yt-stream-"):
+            continue
+        path = os.path.join(tmp_dir, name)
+        try:
+            if os.path.isdir(path) and now - os.path.getmtime(path) > max_age:
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+        except Exception:
+            continue
+
+    if removed:
+        logger.info("Removed %s stale workspaces", removed)
+
+
 def _build_format_selector(format_id: str) -> str:
     if format_id and format_id != "best":
         return f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
@@ -54,6 +76,8 @@ def _build_format_selector(format_id: str) -> str:
 
 
 def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
+    cleanup_stale_workspaces(max_age_hours=6)
+
     workspace = tempfile.mkdtemp(prefix="yt-stream-")
     output_template = os.path.join(workspace, "video.%(ext)s")
 
@@ -62,9 +86,14 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
-        "retries": 5,
-        "fragment_retries": 5,
+        "retries": 10,
+        "fragment_retries": 10,
+        "file_access_retries": 10,
+        "concurrent_fragment_downloads": 5,
+        "http_chunk_size": "10M",
         "socket_timeout": 30,
+        "throttledrate": 0,
+        "bidi_workaround": True,
         "noprogress": True,
         "format": _build_format_selector(format_id),
         "merge_output_format": "mp4",
@@ -77,12 +106,10 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     if is_ffmpeg_available():
         ydl_opts["ffmpeg_location"] = get_ffmpeg_location()
     else:
-        logger.warning("FFmpeg not available - falling back to progressive formats only")
+        logger.warning("FFmpeg not available - falling back to progressive MP4 formats only")
         preferred = format_id if format_id and format_id != "best" else "best"
         ydl_opts["format"] = f"{preferred}[ext=mp4]/best[ext=mp4]/best"
         ydl_opts.pop("merge_output_format", None)
-
-    logger.info("Preparing download workspace at %s", workspace)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -94,10 +121,13 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
 
             requested = info.get("requested_downloads") or []
             candidate_path = None
+
             if requested:
                 candidate_path = requested[0].get("filepath")
+
             if not candidate_path:
                 candidate_path = info.get("_filename")
+
             if not candidate_path or not os.path.exists(candidate_path):
                 for entry in os.listdir(workspace):
                     test_path = os.path.join(workspace, entry)
@@ -108,12 +138,11 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
             if not candidate_path or not os.path.exists(candidate_path):
                 raise RuntimeError("Download produced no file")
 
-            ext = os.path.splitext(candidate_path)[1] or ".mp4"
             safe_title = sanitize_title(info.get("title"))
-            final_name = f"{safe_title}{ext}"
+            final_name = f"{safe_title}.mp4"
             final_path = os.path.join(workspace, final_name)
 
-            if candidate_path != final_path:
+            if os.path.normcase(candidate_path) != os.path.normcase(final_path):
                 shutil.move(candidate_path, final_path)
 
             filesize = os.path.getsize(final_path) if os.path.exists(final_path) else None
@@ -136,22 +165,3 @@ def cleanup_artifact(artifact: DownloadArtifact) -> None:
         logger.info("Cleaned up workspace %s", artifact.workspace)
     except Exception as exc:
         logger.warning("Failed to clean workspace %s: %s", artifact.workspace, exc)
-
-
-def cleanup_stale_workspaces(max_age_hours: int = 6) -> None:
-    now = time.time()
-    max_age = max_age_hours * 3600
-    tmp_dir = tempfile.gettempdir()
-    removed = 0
-    for entry in os.listdir(tmp_dir):
-        if not entry.startswith("yt-stream-"):
-            continue
-        path = os.path.join(tmp_dir, entry)
-        try:
-            if os.path.isdir(path) and now - os.path.getmtime(path) > max_age:
-                shutil.rmtree(path, ignore_errors=True)
-                removed += 1
-        except Exception:
-            continue
-    if removed:
-        logger.info("Removed %s stale workspaces", removed)
