@@ -81,7 +81,10 @@ async def on_startup():
     logger.info("YouTube Downloader API Ready")
     logger.info("yt-dlp version: %s", simple_downloader.get_yt_dlp_version())
     logger.info("FFmpeg location: %s", simple_downloader.get_ffmpeg_location())
-    logger.info("Cookies: %s", "Found" if os.path.exists(simple_downloader.COOKIES_FILE) else "Not found")
+    if os.path.exists(simple_downloader.COOKIES_FILE):
+        logger.info("Cookies loaded")
+    else:
+        logger.info("Cookies missing")
     logger.info("=" * 50)
 
 
@@ -125,6 +128,10 @@ def get_metadata(request: Request, url: str):
 
     if os.path.exists(simple_downloader.COOKIES_FILE):
         ydl_opts["cookiefile"] = simple_downloader.COOKIES_FILE
+        ydl_opts["--cookies"] = simple_downloader.COOKIES_FILE
+        logger.info("Cookies loaded")
+    else:
+        logger.info("Cookies missing")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

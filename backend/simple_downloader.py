@@ -75,12 +75,7 @@ def _build_format_selector(format_id: str) -> str:
     return "bestvideo+bestaudio/best"
 
 
-def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
-    cleanup_stale_workspaces(max_age_hours=6)
-
-    workspace = tempfile.mkdtemp(prefix="yt-stream-")
-    output_template = os.path.join(workspace, "video.%(ext)s")
-
+def get_ydl_opts(output_template: str, format_id: str) -> dict:
     ydl_opts = {
         "outtmpl": output_template,
         "quiet": True,
@@ -101,7 +96,10 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
 
     if os.path.exists(COOKIES_FILE):
         ydl_opts["cookiefile"] = COOKIES_FILE
-        logger.info("Using cookies file for download")
+        ydl_opts["--cookies"] = COOKIES_FILE
+        logger.info("Cookies loaded")
+    else:
+        logger.info("Cookies missing")
 
     if is_ffmpeg_available():
         ydl_opts["ffmpeg_location"] = get_ffmpeg_location()
@@ -110,6 +108,17 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
         preferred = format_id if format_id and format_id != "best" else "best"
         ydl_opts["format"] = f"{preferred}[ext=mp4]/best[ext=mp4]/best"
         ydl_opts.pop("merge_output_format", None)
+
+    return ydl_opts
+
+
+def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
+    cleanup_stale_workspaces(max_age_hours=6)
+
+    workspace = tempfile.mkdtemp(prefix="yt-stream-")
+    output_template = os.path.join(workspace, "video.%(ext)s")
+
+    ydl_opts = get_ydl_opts(output_template, format_id)
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
