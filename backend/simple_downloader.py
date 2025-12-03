@@ -59,13 +59,20 @@ def download(url: str, format_id: str = "best", title: str = None) -> tuple[str,
     
     if is_ffmpeg_available():
         ydl_opts["ffmpeg_location"] = get_ffmpeg_location()
-    
-    if format_id and format_id != "best":
-        ydl_opts["format"] = f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
+        # With FFmpeg: can merge separate video+audio streams
+        if format_id and format_id != "best":
+            ydl_opts["format"] = f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
+        else:
+            ydl_opts["format"] = "bestvideo+bestaudio/best"
+        ydl_opts["merge_output_format"] = "mp4"
     else:
-        ydl_opts["format"] = "bestvideo+bestaudio/best"
-    
-    ydl_opts["merge_output_format"] = "mp4"
+        # Without FFmpeg: must use pre-merged formats only
+        logger.warning("FFmpeg not available - using pre-merged formats only")
+        if format_id and format_id != "best":
+            # Try the format, fallback to best single file
+            ydl_opts["format"] = f"{format_id}/best[ext=mp4]/best"
+        else:
+            ydl_opts["format"] = "best[ext=mp4]/best"
     
     logger.info(f"Starting download: {url[:50]}... format={format_id}")
     

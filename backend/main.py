@@ -151,7 +151,8 @@ def get_metadata(request: Request, url: str):
                 "channel": info.get("channel") or info.get("uploader"),
                 "thumbnail": info.get("thumbnail"),
                 "duration": info.get("duration"),
-                "video_formats": video_formats
+                "video_formats": video_formats,
+                "ffmpeg_available": simple_downloader.is_ffmpeg_available()
             }
     
     except BaseAPIError:
