@@ -1,6 +1,7 @@
 "use strict";
 
-const API = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+const isLocalHost = ["localhost", "127.0.0.1", "::1", "0.0.0.0"].includes(location.hostname);
+const API = isLocalHost
   ? "http://127.0.0.1:8000/api"
   : "https://yt-downloader-backend-ogpx.onrender.com/api";
 
