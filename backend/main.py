@@ -129,6 +129,8 @@ def get_metadata(request: Request, url: str):
         "no_write_cookie_file": True,
         "cookiesfrombrowser": None,
         "no_cache_dir": True,
+        "reject_cookies": True,
+        "updating_cache": False,
     }
 
     if cookiefile:

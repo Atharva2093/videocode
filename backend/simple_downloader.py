@@ -131,6 +131,8 @@ def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]
         "no_write_cookie_file": True,
         "cookiesfrombrowser": None,
         "no_cache_dir": True,
+        "reject_cookies": True,
+        "updating_cache": False,
     }
 
     if cookiefile:
@@ -206,6 +208,8 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     except Exception:
         shutil.rmtree(workspace, ignore_errors=True)
         raise
+    finally:
+        cleanup_cookie_jar(cookiefile)
 
 
 def cleanup_artifact(artifact: DownloadArtifact) -> None:
