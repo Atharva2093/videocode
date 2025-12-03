@@ -223,6 +223,9 @@ async function downloadToFolder(folder) {
   floatingProgress.classList.remove("hidden");
   progressContainer.classList.remove("hidden");
   
+  let writable;
+  let filename;
+  
   try {
     const res = await fetch(`${API}/download?url=${encodeURIComponent(currentUrl)}&format_id=${encodeURIComponent(selectedFormatId)}`);
     
@@ -235,9 +238,10 @@ async function downloadToFolder(folder) {
     if (!res.ok) throw new Error(`Server error: ${res.status}`);
     if (!res.body) throw new Error("No data received");
     
-    const filename = sanitizeFilename(currentTitle) + ".mp4";
+    const disposition = res.headers.get("Content-Disposition") || "";
+    filename = resolveFilename(disposition, currentTitle);
     const fileHandle = await folder.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
+    writable = await fileHandle.createWritable();
     
     const total = parseInt(res.headers.get("Content-Length") || "0", 10);
     const reader = res.body.getReader();
@@ -272,6 +276,9 @@ async function downloadToFolder(folder) {
     setTimeout(() => { setDownloadState("idle"); resetProgress(); }, 3000);
     
   } catch (err) {
+    if (writable) {
+      try { await writable.abort(); } catch (_) {}
+    }
     floatingProgress.classList.add("hidden");
     setDownloadState("idle");
     progressContainer.classList.add("hidden");
@@ -303,6 +310,26 @@ function setDownloadState(state) {
   } else {
     downloadBtn.textContent = "⬇️ Download MP4";
   }
+}
+
+function resolveFilename(disposition, fallbackTitle) {
+  const fallback = sanitizeFilename(fallbackTitle) + ".mp4";
+  if (!disposition) return fallback;
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  if (!match) return fallback;
+  const raw = match[1].trim();
+  if (!raw) return fallback;
+  const lastDot = raw.lastIndexOf(".");
+  let base = raw;
+  let ext = "mp4";
+  if (lastDot > 0 && lastDot < raw.length - 1) {
+    base = raw.slice(0, lastDot);
+    ext = raw.slice(lastDot + 1);
+  }
+  const cleanBase = sanitizeFilename(base);
+  const cleanExt = (ext || "mp4").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  if (!cleanBase) return fallback;
+  return `${cleanBase}.${cleanExt || "mp4"}`;
 }
 
 function sanitizeFilename(name) {
