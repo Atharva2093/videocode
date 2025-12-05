@@ -161,6 +161,7 @@ def _is_supported_mp4_format(entry: Dict) -> bool:
 
 def filter_supported_formats(formats: Iterable[Dict]) -> List[Dict]:
     filtered = [entry for entry in (formats or []) if _is_supported_mp4_format(entry)]
+    logger.info("filter_supported_formats: %s MP4 candidates available", len(filtered))
     # sort highest resolution first
     filtered.sort(key=lambda item: (item.get("height") or 0, item.get("fps") or 0), reverse=True)
     return filtered
