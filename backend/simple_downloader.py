@@ -117,6 +117,16 @@ def cleanup_cookie_jar(temp_path: Optional[str]) -> None:
         logger.warning("Failed to remove temp cookies file %s: %s", temp_path, exc)
 
 
+def acquire_cookiefile(dest_dir: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
+    """Return a tuple of (cookiefile_path, temp_path) for use in yt-dlp."""
+    path = prepare_cookie_jar(dest_dir=dest_dir)
+    return path, path
+
+
+def release_cookiefile(temp_path: Optional[str]) -> None:
+    cleanup_cookie_jar(temp_path)
+
+
 def _build_format_selector(format_id: str) -> str:
     if format_id and format_id != "best":
         return f"{format_id}+bestaudio/{format_id}/bestvideo+bestaudio/best"
@@ -198,6 +208,29 @@ def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]
     return ydl_opts
 
 
+def build_metadata_opts(cookiefile: Optional[str]) -> dict:
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "skip_download": True,
+        "nocheckcertificate": True,
+        "socket_timeout": 15,
+        "retries": 10,
+        "fragment_retries": 10,
+        "file_access_retries": 5,
+        "http_chunk_size": "10M",
+        "noprogress": True,
+        "no_write_cookie_file": True,
+        "cookiesfrombrowser": None,
+        "no_cache_dir": True,
+        "reject_cookies": True,
+    }
+
+    if cookiefile:
+        opts["cookiefile"] = cookiefile
+    return opts
+
+
 def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     """
     Prepare and perform the download in a temp workspace, returning a DownloadArtifact
@@ -209,12 +242,13 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     workspace = tempfile.mkdtemp(prefix="yt-stream-")
     output_template = os.path.join(workspace, "video.%(ext)s")
 
-    cookiefile = prepare_cookie_jar(dest_dir=workspace)
+    cookiefile, temp_cookie = acquire_cookiefile(dest_dir=workspace)
     ydl_opts = get_ydl_opts(output_template, format_id, cookiefile)
 
     try:
         # First fetch metadata to validate formats
-        with yt_dlp.YoutubeDL({**ydl_opts, "skip_download": True, "socket_timeout": 15}) as ydl:
+        metadata_opts = build_metadata_opts(cookiefile)
+        with yt_dlp.YoutubeDL(metadata_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
         if not info:
@@ -286,7 +320,7 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
         shutil.rmtree(workspace, ignore_errors=True)
         raise
     finally:
-        cleanup_cookie_jar(cookiefile)
+        release_cookiefile(temp_cookie)
 
 
 def cleanup_artifact(artifact: DownloadArtifact) -> None:
