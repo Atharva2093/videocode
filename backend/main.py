@@ -205,9 +205,12 @@ def download_video(
                 while chunk := file_handle.read(1024 * 1024):
                     yield chunk
 
+        # Use RFC 5987 encoding for filenames with non-ASCII characters
+        from urllib.parse import quote
         safe_filename = artifact.filename.replace('"', "'")
+        encoded_filename = quote(safe_filename)
         headers = {
-            "Content-Disposition": f'attachment; filename="{safe_filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_filename.encode("ascii", "ignore").decode("ascii")}"; filename*=UTF-8\'\'{encoded_filename}',
             "Content-Type": "video/mp4",
         }
         if artifact.filesize is not None:

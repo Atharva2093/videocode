@@ -10,9 +10,20 @@ from typing import Dict, Iterable, List, Optional
 # Workaround for termios not available on Windows
 if sys.platform == "win32":
     import types
-    sys.modules["termios"] = types.ModuleType("termios")
-    sys.modules["tty"] = types.ModuleType("tty")
-    sys.modules["pty"] = types.ModuleType("pty")
+    
+    # Create mock termios module
+    termios_mock = types.ModuleType("termios")
+    sys.modules["termios"] = termios_mock
+    
+    # Create mock tty module
+    tty_mock = types.ModuleType("tty")
+    sys.modules["tty"] = tty_mock
+    
+    # Create mock pty module with required attributes
+    pty_mock = types.ModuleType("pty")
+    pty_mock.openpty = lambda: (None, None)
+    pty_mock.spawn = lambda *args, **kwargs: None
+    sys.modules["pty"] = pty_mock
 
 import yt_dlp
 
@@ -161,7 +172,7 @@ def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]
         "fragment_retries": 10,
         "file_access_retries": 10,
         "concurrent_fragment_downloads": 5,
-        "http_chunk_size": "10M",
+        "http_chunk_size": 10485760,
         "socket_timeout": 30,
         "throttledrate": 0,
         "bidi_workaround": True,
