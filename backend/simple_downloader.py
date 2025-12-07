@@ -1,25 +1,29 @@
 import logging
 import os
-import re
 import shutil
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional
 
+# Workaround for termios not available on Windows
+if sys.platform == "win32":
+    import types
+    sys.modules["termios"] = types.ModuleType("termios")
+    sys.modules["tty"] = types.ModuleType("tty")
+    sys.modules["pty"] = types.ModuleType("pty")
+
 import yt_dlp
 
 from exceptions import InvalidURLError
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
 
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BACKEND_DIR, "cookies.txt")
 
-# Render / K8s secret path (read-only) — keep this path but copy into writable temp before use
 if os.path.exists("/etc/secrets/cookies.txt"):
     COOKIES_FILE = "/etc/secrets/cookies.txt"
 
@@ -47,8 +51,8 @@ def get_yt_dlp_version() -> str:
 def sanitize_title(title: Optional[str]) -> str:
     if not title:
         return "video"
-    safe = re.sub(r'[\\/:*?"<>|]', "", title)
-    safe = re.sub(r"\s+", " ", safe).strip()
+    safe = "".join(c for c in title if c not in '\\/:*?"<>|')
+    safe = " ".join(safe.split())
     return safe[:150] if safe else "video"
 
 
@@ -58,30 +62,22 @@ def cleanup_stale_workspaces(max_age_hours: int = 6) -> None:
     max_age = max_age_hours * 3600
     removed = 0
 
-    try:
-        for name in os.listdir(tmp_dir):
-            if not name.startswith("yt-stream-"):
-                continue
-            path = os.path.join(tmp_dir, name)
-            try:
-                if os.path.isdir(path) and now - os.path.getmtime(path) > max_age:
-                    shutil.rmtree(path, ignore_errors=True)
-                    removed += 1
-            except Exception:
-                continue
-    except Exception:
-        # non-fatal if tmp listing fails
-        pass
+    for name in os.listdir(tmp_dir):
+        if not name.startswith("yt-stream-"):
+            continue
+        path = os.path.join(tmp_dir, name)
+        try:
+            if os.path.isdir(path) and now - os.path.getmtime(path) > max_age:
+                shutil.rmtree(path, ignore_errors=True)
+                removed += 1
+        except Exception:
+            continue
 
     if removed:
-        logger.info("Removed %s stale workspaces", removed)
+        logger.info("Removed %d stale workspaces", removed)
 
 
 def prepare_cookie_jar(dest_dir: Optional[str] = None) -> Optional[str]:
-    """
-    Copy the read-only cookies file to a writable location.
-    Returns path to the writable cookiefile or None if not available.
-    """
     if not os.path.exists(COOKIES_FILE):
         return None
 
@@ -97,7 +93,6 @@ def prepare_cookie_jar(dest_dir: Optional[str] = None) -> Optional[str]:
         try:
             os.chmod(target_path, 0o600)
         except (PermissionError, NotImplementedError):
-            # ignore if not supported on platform
             pass
 
         return target_path
@@ -136,8 +131,6 @@ def _build_format_selector(format_id: str) -> str:
 def _is_supported_mp4_format(entry: Dict) -> bool:
     if not entry or entry.get("has_drm"):
         return False
-    if not entry.get("url"):
-        return False
     if entry.get("ext") != "mp4":
         return False
     if entry.get("vcodec", "none") in ("none", None):
@@ -145,14 +138,7 @@ def _is_supported_mp4_format(entry: Dict) -> bool:
     if not entry.get("height"):
         return False
 
-    format_note = (entry.get("format_note") or "").lower()
     protocol = (entry.get("protocol") or "").lower()
-
-    # exclude webm / dash / hls / segmented protocols that can't be streamed safely without ffmpeg
-    if "webm" in format_note:
-        return False
-    if any(flag in format_note for flag in ("dash", "hls")):
-        return False
     if protocol in {"m3u8", "m3u8_native", "dash", "http_dash_segments"}:
         return False
 
@@ -160,10 +146,8 @@ def _is_supported_mp4_format(entry: Dict) -> bool:
 
 
 def filter_supported_formats(formats: Iterable[Dict]) -> List[Dict]:
-    filtered = [entry for entry in (formats or []) if _is_supported_mp4_format(entry)]
-    logger.info("filter_supported_formats: %s MP4 candidates available", len(filtered))
-    # sort highest resolution first
-    filtered.sort(key=lambda item: (item.get("height") or 0, item.get("fps") or 0), reverse=True)
+    filtered = [entry for entry in formats if _is_supported_mp4_format(entry)]
+    filtered.sort(key=lambda x: (x.get("height") or 0, x.get("fps") or 0), reverse=True)
     return filtered
 
 
@@ -182,26 +166,23 @@ def get_ydl_opts(output_template: str, format_id: str, cookiefile: Optional[str]
         "throttledrate": 0,
         "bidi_workaround": True,
         "noprogress": True,
+        "no_color": True,
         "format": _build_format_selector(format_id),
         "merge_output_format": "mp4",
         "no_write_cookie_file": True,
         "cookiesfrombrowser": None,
         "no_cache_dir": True,
-        # disable internal cache updates / cookie writes
         "reject_cookies": True,
+        "color": "no_color",
     }
 
     if cookiefile:
         ydl_opts["cookiefile"] = cookiefile
-        logger.info("Cookies loaded")
-    else:
-        logger.info("Cookies missing")
 
     if is_ffmpeg_available():
         ydl_opts["ffmpeg_location"] = get_ffmpeg_location()
     else:
-        # prefer progressive mp4s if ffmpeg isn't installed
-        logger.warning("FFmpeg not available - falling back to progressive MP4 formats only")
+        logger.warning("FFmpeg not available - falling back to progressive MP4 formats")
         preferred = format_id if format_id and format_id != "best" else "best"
         ydl_opts["format"] = f"{preferred}[ext=mp4]/best[ext=mp4]/best"
         ydl_opts.pop("merge_output_format", None)
@@ -219,25 +200,22 @@ def build_metadata_opts(cookiefile: Optional[str]) -> dict:
         "retries": 10,
         "fragment_retries": 10,
         "file_access_retries": 5,
-        "http_chunk_size": "10M",
         "noprogress": True,
+        "no_color": True,
         "no_write_cookie_file": True,
         "cookiesfrombrowser": None,
         "no_cache_dir": True,
         "reject_cookies": True,
+        "color": "no_color",
     }
 
     if cookiefile:
         opts["cookiefile"] = cookiefile
+
     return opts
 
 
 def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
-    """
-    Prepare and perform the download in a temp workspace, returning a DownloadArtifact
-    pointing to the final file in that workspace. Caller should stream the file and
-    then call cleanup_artifact to remove the workspace.
-    """
     cleanup_stale_workspaces(max_age_hours=6)
 
     workspace = tempfile.mkdtemp(prefix="yt-stream-")
@@ -247,7 +225,6 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     ydl_opts = get_ydl_opts(output_template, format_id, cookiefile)
 
     try:
-        # First fetch metadata to validate formats
         metadata_opts = build_metadata_opts(cookiefile)
         with yt_dlp.YoutubeDL(metadata_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -262,9 +239,7 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
         if format_id and format_id != "best" and format_id not in allowed_ids:
             raise InvalidURLError(message="Invalid or unsupported format ID.")
 
-        # Now perform actual download (this will write into the workspace)
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # extract_info with download=True downloads and returns updated info
             info = ydl.extract_info(url, download=True)
 
         requested = info.get("requested_downloads") or []
@@ -277,7 +252,6 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
             candidate_path = info.get("_filename")
 
         if not candidate_path or not os.path.exists(candidate_path):
-            # fallback: pick any file produced in workspace
             for entry in os.listdir(workspace):
                 test_path = os.path.join(workspace, entry)
                 if os.path.isfile(test_path):
@@ -291,17 +265,8 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
         final_name = f"{safe_title}.mp4"
         final_path = os.path.join(workspace, final_name)
 
-        # rename/move to nice final filename
         if os.path.normcase(candidate_path) != os.path.normcase(final_path):
-            try:
-                shutil.move(candidate_path, final_path)
-            except Exception:
-                # if move fails, try copy+remove
-                shutil.copyfile(candidate_path, final_path)
-                try:
-                    os.remove(candidate_path)
-                except Exception:
-                    pass
+            shutil.move(candidate_path, final_path)
 
         filesize = os.path.getsize(final_path) if os.path.exists(final_path) else None
         logger.info("Prepared artifact %s (%s bytes)", final_name, filesize or "unknown")
@@ -315,9 +280,7 @@ def prepare_download(url: str, format_id: str = "best") -> DownloadArtifact:
     except InvalidURLError:
         shutil.rmtree(workspace, ignore_errors=True)
         raise
-    except Exception as exc:
-        # ensure workspace cleaned on failure
-        logger.exception("Download preparation failed: %s", exc)
+    except Exception:
         shutil.rmtree(workspace, ignore_errors=True)
         raise
     finally:
